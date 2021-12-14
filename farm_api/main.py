@@ -8,12 +8,12 @@ def index():
     my_json :return: dict 格式的数据
     """
     my_json = request.get_json()
-    name = request.get_json().get("name")
-    age = request.get_json().get("age")
-    city = request.get_json().get("city")
-    age += 100
-    print_data(name, age, city)
-    print (type(my_json))
+    # name = request.get_json().get("name")
+    # age = request.get_json().get("age")
+    # city = request.get_json().get("city")
+    # age += 100
+    # print_data(name, age, city)
+    print (my_json)
     return my_json
 
 @app.route("/status",methods=["GET"])
