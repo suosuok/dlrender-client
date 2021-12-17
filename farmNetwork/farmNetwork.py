@@ -10,6 +10,8 @@ import os
 import time
 
 
+client_exe = "E:\\work\\dlrender-client\\client.exe"
+
 def start_exe(exe_path):
     """
     独立启动exe
@@ -36,16 +38,20 @@ class GetStatus:
 
     def post_data(self):
         data = self.body
-        url = self.base_url + "/index"
+        url = self.base_url + "/render/preUpload"
         res = requests.post(url, data=json.dumps(data), headers=self.headers)
         if res.status_code == 200:
             return (res.text)
 
 
 class AnalyseIni:
+    base_url = 'http://47.97.199.187:6008'
+    body = {}
+    headers = {'content-type': "application/json"}
+
+
     def __init__(self, inipath):
         self.inifile = inipath
-
 
     def ini_to_json(self):
         temp_dict = {}
@@ -61,8 +67,27 @@ class AnalyseIni:
             temp_dict["{}".format(key)] = subdict
         return  temp_dict
 
+    def post_jsonData(self):
+        json_data = self.ini_to_json()
+        gs = GetStatus(self.base_url, body = json_data, headers= self.headers)
+        if (gs.client_status()) == 200:
+            result_string = json.dumps(gs.post_data())
+            print(result_string)  # 返回的是字符串，要变dict需要处理
+            # os.remove()
+            time.sleep(2)
+            return 1
+        else:
+            print ("连接失败")
+            print (403)
 
 
+
+
+def start_client():
+    if os.path.exists(client_exe):
+        start_exe(client_exe)
+    else:
+        pass
 
 def run():
     parser = argparse.ArgumentParser()
@@ -71,26 +96,11 @@ def run():
     results = parser.parse_args()
 
     if results.status is not None :
-        client_exe = "E:\\work\\dlrender-client\\client.exe"
-        start_exe(client_exe)
+        start_client()
 
     if results.file_path is not None :
+        AnalyseIni(results.file_path).post_jsonData()
 
-        analyini = AnalyseIni(results.file_path)
-        json_data = analyini.ini_to_json()
-        base_url = 'http://192.168.106.140:5000'
-        body = {}
-        headers = {'content-type': "application/json"}
-        gs = GetStatus(base_url, body = json_data, headers= headers)
-        if (gs.client_status()) == 200:
-            result_string = json.dumps(gs.post_data())
-            print(result_string)  # 返回的是字符串，要变dict需要处理
-            os.remove(results.file_path)
-            time.sleep(2)
-            return 1
-        else:
-            print ("连接失败")
-            print (403)
 
 if __name__ == "__main__":
     "测试使用test函数，打包使用run函数，打包后exe -f file.ini ,即可post数据到服务端"
