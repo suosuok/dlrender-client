@@ -21,7 +21,6 @@ def start_exe(exe_path):
         0, 'open', exe_path, '', os.path.dirname(exe_path), 1
     )
 
-
 class GetStatus:
     def __init__(self, url, body, headers):
         self.base_url = url
