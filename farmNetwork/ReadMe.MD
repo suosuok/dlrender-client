@@ -4,3 +4,4 @@
 
 3  安装完成后，终端下  pyinstaller -F farmNetwork.py ，即可生成exe  ，生成exe地址为 ../dist/farmNetwork.exe 
 
+4
