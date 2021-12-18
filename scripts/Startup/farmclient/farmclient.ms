@@ -222,6 +222,53 @@ function runapp exepath waitexit args:unsupplied =
         return 1
     )
 )
+fn Setformat str =
+(
+    format "%%%       %\n" "[" localtime "]" str
+)
+fn runcmd exe_path arg_array:undefined  =
+(
+    local process = dotNetObject "System.Diagnostics.Process"
+    process.StartInfo.CreateNoWindow = true
+    process.StartInfo.UseShellExecute = false
+    process.StartInfo.RedirectStandardOutput = true
+    process.StartInfo.RedirectStandardError = true
+    process.StartInfo.FileName = exe_path
+    process.StartInfo.Arguments = ""
+
+    if arg_array != undefined then
+    (
+        for arg in arg_array do (process.StartInfo.Arguments += (" " + arg as string))
+    )
+
+    SETFORMAT (exe_path)
+
+    if doesfileexist exe_path then
+    (
+        try(
+            process.Start()
+        )catch( messagebox "客户端程序不完整,请联系在线客服！ \n  \n " beep:false  )
+
+        SETFORMAT ( "start cmd\n")
+        local cmd_result = ""
+        while not process.StandardOutput.EndOfStream do
+        (
+            local output_line = process.StandardOutput.ReadLine()
+            SETFORMAT (output_line)
+            --Main_rollout.Sc_prompt_info.caption = ("execute:"+(output_line as string))
+            cmd_result=cmd_result+output_line
+        )
+        process.WaitForExit()
+        process.Close()
+        process.Dispose()
+        cmd_result
+    )
+    else
+    (
+        SETFORMAT (exe_path)
+        messagebox "客户端程序不完整,请联系在线客服!  \n  \n " beep:false
+    )
+)
 
 function getTimeString = (
     local t = getLocalTime()
@@ -2493,11 +2540,19 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             messagebox "客户端不存在，请重新安装。        " title:myAppName
             return false
         )
+        arg = " -f " + taskIniFilePath + "\""
+        local returnString  = runcmd apppath arg_array:#(arg)
+        print ("returnString = " + returnString)
+        if  returnString == "200" then (
 
-        runapp ("\"" + apppath + "\"")  false args:#("-f\"" + taskIniFilePath + "\"")
+            checkSubmitClock.active = true
+            -- messagebox "正在提交渲染任务，请等待完成，不要修改max文件！        " title:myAppName
+        )
+        else(
+            messagebox "提交失败，客户端无法连接到网络       " title:myAppName
+        )
+        -- runapp ("\"" + apppath + "\"")  false args:#("-f\"" + taskIniFilePath + "\"")
 
-        checkSubmitClock.active = true
-        messagebox "正在提交渲染任务，请等待完成，不要修改max文件！        " title:myAppName
     )
 
     on checkSubmitClock tick do (
