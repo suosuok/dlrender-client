@@ -43,6 +43,7 @@ class WSClient:
         self.ws.send(json.dumps(params))
         #print("Sending Data: {}".format(params))
         result = self.ws.recv()
+        "打印返回码，maxscripts接收返回码，判断状态"
         print(result)
 
     def quit(self):
