@@ -1,16 +1,26 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
-import requests
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+
+"""
+测试ws 使用
+需要安装
+pip install websocket,websocket-client
+pip install pywin32
+
+
+"""
 import json
+import time
 import argparse
 import configparser
 import win32api
+from websocket import create_connection
 import os
-import time
 
 
-client_exe = "E:\\work\\dlrender-client\\client.exe"
+COMMAND_CLIENT_EXTRA_CHECK_STATUS = 'check_status'
+COMMAND_CLIENT_EXTRA_SUBMIT_JOB = 'submit_job'
 
 def start_exe(exe_path):
     """
@@ -21,87 +31,69 @@ def start_exe(exe_path):
         0, 'open', exe_path, '', os.path.dirname(exe_path), 1
     )
 
-class GetStatus:
-    def __init__(self, url, body, headers):
-        self.base_url = url
-        self.body = body
-        self.headers = headers
+class WSClient:
+    address = "ws://127.0.0.1"
+    prot = 5665
+    ws_address = address + ":{}/ws".format(prot)
 
-    def client_status(self):
-        try:
-            url = self.base_url + "/status"
-            res = requests.get(url)
-            return res.status_code
-        except:
-            return "403"
+    def __init__(self):
+        self.ws = create_connection(self.ws_address)
 
-    def post_data(self):
-        data = self.body
-        url = self.base_url + "/render/preUpload"
-        res = requests.post(url, data=json.dumps(data), headers=self.headers)
-        if res.status_code == 200:
-            return (res.text)
+    def send(self, params):
+        self.ws.send(json.dumps(params))
+        #print("Sending Data: {}".format(params))
+        result = self.ws.recv()
+        print(result)
 
+    def quit(self):
+        self.ws.close()
 
-class AnalyseIni:
-    base_url = 'http://47.97.199.187:6008'
-    body = {}
-    headers = {'content-type': "application/json"}
-
-
+class AnalyseIni():
     def __init__(self, inipath):
         self.inifile = inipath
 
     def ini_to_json(self):
         temp_dict = {}
         configer = configparser.ConfigParser()
-        print ("inifile = {}".format(self.inifile))
 
         configer.read(self.inifile, encoding='UTF-16')
         for key in configer.sections() :
             subdict = {}
             for subkey in configer.options(key):
-                print (subkey," = ", configer.get(key,subkey))
                 subdict.update({"{}".format(subkey):"{}".format(configer.get(key,subkey)) })
             temp_dict["{}".format(key)] = subdict
-        return  temp_dict
-
-    def post_jsonData(self):
-        json_data = self.ini_to_json()
-        gs = GetStatus(self.base_url, body = json_data, headers= self.headers)
-        if (gs.client_status()) == 200:
-            result_string = json.dumps(gs.post_data())
-            print(result_string)  # 返回的是字符串，要变dict需要处理
-            # os.remove()
-            time.sleep(2)
-            return 1
-        else:
-            print ("连接失败")
-            print (403)
+        return temp_dict
 
 
+status = {"cmd":COMMAND_CLIENT_EXTRA_CHECK_STATUS, "arg":"-s"}
+submit = {"cmd":COMMAND_CLIENT_EXTRA_SUBMIT_JOB, "arg":"-f"}
 
-
-def start_client():
-    if os.path.exists(client_exe):
-        start_exe(client_exe)
-    else:
-        pass
 
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", dest="status", help="get client status ")
     parser.add_argument("-f", dest="file_path", help="the configure file path ")
     results = parser.parse_args()
+    # 初始化
+    try:
+        web_client = WSClient()
+    except:
+        print ( "204")
+        exit(204)
+
 
     if results.status is not None :
-        start_client()
+        web_client.send(status)
 
     if results.file_path is not None :
-        AnalyseIni(results.file_path).post_jsonData()
+        json_data = AnalyseIni(results.file_path).ini_to_json()
+        submit["arg"] = json_data
+        web_client.send(submit)
+        os.remove(results.file_path)
 
 
-if __name__ == "__main__":
-    "测试使用test函数，打包使用run函数，打包后exe -f file.ini ,即可post数据到服务端"
+    web_client.quit()
+if __name__ == '__main__':
     run()
+
 
