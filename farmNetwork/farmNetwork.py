@@ -8,8 +8,14 @@
 pip install websocket,websocket-client
 pip install pywin32
 
-
 """
+"""
+状态值  
+200 连接正常
+204 连接失败
+205 压缩失败
+"""
+
 import json
 import time
 import argparse
@@ -17,10 +23,16 @@ import configparser
 import win32api
 from websocket import create_connection
 import os
+import zipfile
 
 
 COMMAND_CLIENT_EXTRA_CHECK_STATUS = 'check_status'
 COMMAND_CLIENT_EXTRA_SUBMIT_JOB = 'submit_job'
+COMMAND_CLIENT_EXTRA_CREATE_ZIP = 'create_zip'
+
+status = {"cmd":COMMAND_CLIENT_EXTRA_CHECK_STATUS, "arg":"-s"}
+submit = {"cmd":COMMAND_CLIENT_EXTRA_SUBMIT_JOB, "arg":"-f"}
+
 
 def start_exe(exe_path):
     """
@@ -57,23 +69,40 @@ class AnalyseIni():
         temp_dict = {}
         configer = configparser.ConfigParser()
 
-        configer.read(self.inifile, encoding='UTF-16')
+        configer.read(self.inifile, encoding='UTF-8')
         for key in configer.sections() :
             subdict = {}
             for subkey in configer.options(key):
                 subdict.update({"{}".format(subkey):"{}".format(configer.get(key,subkey)) })
+
             temp_dict["{}".format(key)] = subdict
         return temp_dict
 
+def read_to_list(file_path):
+    temp_list =[]
+    for line in open(file_path):
+        line = line.strip('\n')
+        temp_list.append(line)
+    return temp_list
 
-status = {"cmd":COMMAND_CLIENT_EXTRA_CHECK_STATUS, "arg":"-s"}
-submit = {"cmd":COMMAND_CLIENT_EXTRA_SUBMIT_JOB, "arg":"-f"}
+def create_zipfile(file_list,output_zippath):
+    try:
+        pre_file_list = read_to_list(file_list)
+        f = zipfile.ZipFile(output_zippath, 'w', zipfile.ZIP_DEFLATED)
+        for file in pre_file_list:
+            f.write(file)
+        f.close()
+        return "Successful"
+    except Exception as e:
+        print (e)
+        return "Fail"
 
 
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", dest="status", help="get client status ")
     parser.add_argument("-f", dest="file_path", help="the configure file path ")
+    parser.add_argument("-zip",dest="create_zip", help="Crate the zip file for job ")
     results = parser.parse_args()
     # 初始化
     try:
@@ -82,16 +111,24 @@ def run():
         print ( "204")
         exit(204)
 
-
     if results.status is not None :
         web_client.send(status)
 
     if results.file_path is not None :
         json_data = AnalyseIni(results.file_path).ini_to_json()
+        zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
+        zip_path = results.create_zip
+        # print(zip_path)
+        create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
+        if create_zipfile_result == "Successful":
+            pass
+            # # os.remove(results.file_path)
+        else:
+            return "205"
+
+        json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
         submit["arg"] = json_data
         web_client.send(submit)
-        os.remove(results.file_path)
-
 
     web_client.quit()
 if __name__ == '__main__':
