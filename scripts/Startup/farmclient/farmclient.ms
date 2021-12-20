@@ -2528,6 +2528,9 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         taskIniFilePath = createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode args
 
         print (taskIniFilePath)
+
+        temp_zipfile =  replaceSub taskIniFilePath ".ini" ".zip"
+        print(temp_zipfile)
         local apppath = getRenderFarmAppPath()
         print(apppath)
 
@@ -2540,13 +2543,15 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             messagebox "客户端不存在，请重新安装。        " title:myAppName
             return false
         )
-        arg = " -f " + taskIniFilePath + "\""
+        arg = " -f " + taskIniFilePath + "\"" + " -zip" +  temp_zipfile + "\""
         local returnString  = runcmd apppath arg_array:#(arg)
         print ("returnString = " + returnString)
         if  returnString == "200" then (
 
             checkSubmitClock.active = true
             -- messagebox "正在提交渲染任务，请等待完成，不要修改max文件！        " title:myAppName
+        )elif(returnString == "205" )then (
+            messagebox "压缩失败，请联系客服人员         " title:myAppName
         )
         else(
             messagebox "提交失败，客户端无法连接到网络       " title:myAppName
