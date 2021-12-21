@@ -2265,7 +2265,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         if homepage.count > 0 then (
             ShellLaunch homepage ""
         ) else (
-            ShellLaunch "www.speedyrender.cn" ""
+            ShellLaunch "www.renderfarm.com" ""
         )
     )
 
