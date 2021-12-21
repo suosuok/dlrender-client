@@ -853,7 +853,7 @@ function QueryBoxWithTextbox parentHwnd strTitle strFilesList YesText:unsupplied
 function modifyOutputGamma args =
 (
     local value = args.Item["gamma_fileout_value"]
-    fileOutGamma = value
+    resetOutGamma = value
 )
 
 function getFirstEngineIndex name = (
@@ -921,7 +921,7 @@ function modifyCoronaRendererSetting args =
             cr.renderSelected_mode = 0
         )
     )catch()
-    
+
     true
 )
 
@@ -958,13 +958,15 @@ function modifySceneFile args =
     try (
         if rendOutputFilename.count == 0 then (
             rendSaveFile = true
-            rendOutputFilename = "c:\\A-.TGA"
+            rendOutputFilename = "c:\\farm-.TGA"
         )
     )catch()
 
     local gammaCorrection = args.Item["gamma_correction"]
     if gammaCorrection then (
         modifyOutputGamma(args)
+    )else(
+        re  =fileOutGamma
     )
 
     local modifyResult = false
@@ -1012,7 +1014,7 @@ function createZipFilesList tempdir strtime extralFiles renderName =
     local assetsFullPath = assetInfo[1]
     --format "valid asset files count %\n" assetsFullPath.count
 
-    local tempListFilePath = tempDir + "kx-maxfiles-" +strtime + ".txt"
+    local tempListFilePath = tempDir + "farm-maxconfig-" +strtime + ".txt"
     -- deleteFile tempListFilePath
     print tempListFilePath
 
@@ -1209,7 +1211,7 @@ function getTyFlowCache =(
     local assetsFullPath = assetInfo[1]
 
     local tycFileStatus = false
-    for i = 1 to assetsFullPath.count do ( 
+    for i = 1 to assetsFullPath.count do (
         if getFilenameType assetsFullPath[i] == ".tyc" then(
             tycFileStatus = true
         )
@@ -1293,8 +1295,8 @@ function isSceneUseCorona =
     false
 )
 
-function createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout cameraList taskFrame lightRate freemode args =
-(   
+function createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout cameraList taskFrame lightRate freemode resetOutGamma args =
+(
 
     local tempIniFilePath = tempDir + "kx-task-" + strtime + ".ini"
     print tempIniFilePath
@@ -1345,6 +1347,7 @@ function createIniFile tempdir strtime tempFilesListPath outputFilename machineL
     setINISetting tempIniFilePath "Arguments" "renderoutputfilename" outputFilename
     setINISetting tempIniFilePath "Arguments" "machinelimit" (machineLimit as string)
     setINISetting tempIniFilePath "Arguments" "tasktimeoutminutes" (taskTimeout as string)
+    setINISetting tempIniFilePath "Arguments" "fileOutGamma" (resetOutGamma as string)
 
     --setINISetting tempIniFilePath "Arguments" "cameras" (cameraList as string)
     local camera_index = 0
@@ -1880,13 +1883,13 @@ function checkInvalidObjectName =
 
 function repalceSub str1 str2 str3= (
 	while( (i = findstring str1 str2)!=undefined )do(
-		
+
 		str1 =replace str1 i str2.count str3
 		)
 		return str1
-	
+
 	)
-	
+
 rollout renderfarmSetting "渲染设置" width:500 height:660
 (
     local lastRendImageAspectRatio = rendImageAspectRatio
@@ -2363,8 +2366,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             messagebox "帧序列不能为空。        " title:myAppName
             return false
         )
-        
-        
+
+
         local dateEpoch = dotNetObject "System.Text.RegularExpressions.Regex" "^((\d+(([,]|[ ]+)\d+)*)|(\d+-\d+(:\d+)?))$"
         local frameRegx = dateEpoch.Match(taskFrame)
         if not frameRegx.success then(
@@ -2393,7 +2396,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         if tyFlowCache then(
             local tyFlowCacheYesNo = queryBox "检测使用了tyFlow渲染器并使用了缓存文件，请使用添加《缓存文件夹》的方式上传缓存文件。\n \n如果已经手动添加了缓存文件，请无视此次提示                  " title:myAppName
             if tyFlowCacheYesNo then(
-               return false 
+               return false
             )
         )
 
@@ -2468,7 +2471,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         )else(
             args.Add "pass_limit"  ""
             args.Add "time_limit" ""
-            args.Add "noise_level_limit" "" 
+            args.Add "noise_level_limit" ""
         )
 
         isAutoBackupEnabled = autosave.Enable
@@ -2476,9 +2479,15 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             autosave.Enable = false
         )
 
-        local currentfileOutGamma = fileOutGamma
+        local currentfileOutGamma = resetOutGamma
+
         local modifyResult = modifySceneFile args
-        fileOutGamma = currentfileOutGamma
+        if not checkboxGamma.checked then (
+            resetOutGamma = fileOutGamma
+        )
+        -- 传参到deadline，不回写文件
+        -- resetOutGamma = currentfileOutGamma
+        -- resetOutGamma = currentfileOutGamma
 
         if not modifyResult then (
             if isAutoBackupEnabled then (
@@ -2532,10 +2541,11 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         local freemode = "0"
         local taskTimeout = 24 * 60
 
-        local outputFilename = "a-." + dropdownlistFileExt.selected
+        local outputFilename = "farm-." + dropdownlistFileExt.selected
         local camerasToRender = cameraSelected.items
 
-        taskIniFilePath = createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode args
+
+        taskIniFilePath = createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode resetOutGamma args
 
         print (taskIniFilePath)
 
