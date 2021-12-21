@@ -2611,7 +2611,6 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
 
 function showSubmitDialog = (
     try(
-        print scriptSelfDir
         local_image = (scriptSelfDir + "\ad.jpg")
         download interNet_image local_image
 
