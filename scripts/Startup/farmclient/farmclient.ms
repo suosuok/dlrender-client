@@ -1,4 +1,7 @@
 ﻿scriptSelfDir = pathConfig.removePathLeaf(getSourceFileName())
+
+global interNet_image = @"https://mirror-hz.oss-cn-hangzhou.aliyuncs.com/logo/ad.jpg"
+global local_image = ""
 if scriptSelfDir.count == 0 then (
     local version = getMaxVersion()
     scriptSelfDir = "C:\\Program Files\\Autodesk\\3ds Max " + version + "\\scripts\\Startup\\farmclient"
@@ -24,7 +27,7 @@ myIniFilePath = (scriptSelfDir + "setting.ini")
 myPluginInBuildVersion = getINISetting myIniFilePath "build" "version"
 myAppDataDirName = getINISetting myIniFilePath "clientinfo" "appdatadirname"
 myAppFileName = getINISetting myIniFilePath "clientinfo" "appfilename"
-myAppRegistryname = getINISetting myIniFilePath "clientinfo" "registryname" 
+myAppRegistryname = getINISetting myIniFilePath "clientinfo" "registryname"
 myAppName = getINISetting myIniFilePath "clientinfo" "name"
 if myAppName == "" then (
     myAppName = "FarmClient"
@@ -486,7 +489,7 @@ function saveSceneFile =
     )
 )
 
-function getAssetFiles = 
+function getAssetFiles =
 (
     local assetFileNames = #()
     local assetFilesCanget = #()
@@ -608,7 +611,7 @@ function fixRenderElementsFileNames =
             renderSceneDialog.open()
             renderSceneDialog.close()
             fullpath =  (rem.GetRenderElementFileName i)
-            
+
         )
 
         local element = rem.GetRenderElement i
@@ -1888,7 +1891,18 @@ function repalceSub str1 str2 str3= (
 		)
 		return str1
 
-	)
+)
+
+fn download externalfile ad_adress =
+(
+
+	webClient = dotnetObject "System.Net.WebClient"
+
+	theUri=dotnetObject "System.Uri" (externalfile)
+	webClient.DownloadFile theUri ad_adress
+)
+
+
 
 rollout renderfarmSetting "渲染设置" width:500 height:660
 (
@@ -1900,7 +1914,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     local vrayVersion = ""
     local settingChanged = false
     local strRendererVersion = ""
-    local imagePath = (scriptSelfDir + "\\ad.jpg")
+    local imagePath = local_image
     local iniFilePath = (scriptSelfDir + "\\setting.ini")
     local taskIniFilePath = ""
     local extList = #("TGA","JPG","EXR","PNG","TIF","BMP", "RPF")
@@ -2596,6 +2610,16 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
 )
 
 function showSubmitDialog = (
+    try(
+        print scriptSelfDir
+        local_image = (scriptSelfDir + "\ad.jpg")
+        print local_image
+        download interNet_image local_image
+
+    )catch(
+        local_image = (scriptSelfDir + "\ad.jpg")
+
+    )
     try(
         if not checkSetting() then (
             return false
