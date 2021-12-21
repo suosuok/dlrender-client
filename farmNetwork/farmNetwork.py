@@ -25,7 +25,6 @@ from websocket import create_connection
 import os
 import zipfile
 
-
 COMMAND_CLIENT_EXTRA_CHECK_STATUS = 'check_status'
 COMMAND_CLIENT_EXTRA_SUBMIT_JOB = 'submit_job'
 COMMAND_CLIENT_EXTRA_CREATE_ZIP = 'create_zip'
