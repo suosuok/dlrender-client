@@ -1877,6 +1877,16 @@ function checkInvalidObjectName =
     true
 )
 
+
+function repalceSub str1 str2 str3= (
+	while( (i = findstring str1 str2)!=undefined )do(
+		
+		str1 =replace str1 i str2.count str3
+		)
+		return str1
+	
+	)
+	
 rollout renderfarmSetting "渲染设置" width:500 height:660
 (
     local lastRendImageAspectRatio = rendImageAspectRatio
@@ -2529,7 +2539,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
 
         print (taskIniFilePath)
 
-        temp_zipfile =  replaceSub taskIniFilePath ".ini" ".zip"
+        temp_zipfile =  repalceSub taskIniFilePath ".ini" ".zip"
         print(temp_zipfile)
         local apppath = getRenderFarmAppPath()
         print(apppath)
@@ -2543,14 +2553,15 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             messagebox "客户端不存在，请重新安装。        " title:myAppName
             return false
         )
-        arg = " -f " + taskIniFilePath + "\"" + " -zip" +  temp_zipfile + "\""
+        arg = " -f " + taskIniFilePath  + " -zip " +  temp_zipfile + "\""
+        print (arg)
         local returnString  = runcmd apppath arg_array:#(arg)
         print ("returnString = " + returnString)
         if  returnString == "200" then (
 
             checkSubmitClock.active = true
             -- messagebox "正在提交渲染任务，请等待完成，不要修改max文件！        " title:myAppName
-        )elif(returnString == "205" )then (
+        )else if(returnString == "205" )then (
             messagebox "压缩失败，请联系客服人员         " title:myAppName
         )
         else(
