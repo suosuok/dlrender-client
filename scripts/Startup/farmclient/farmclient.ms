@@ -2613,7 +2613,6 @@ function showSubmitDialog = (
     try(
         print scriptSelfDir
         local_image = (scriptSelfDir + "\ad.jpg")
-        print local_image
         download interNet_image local_image
 
     )catch(
