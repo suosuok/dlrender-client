@@ -40,7 +40,7 @@ def start_exe(exe_path):
     此方式可能在IDE里面失效，通过cmd运行和编译可正常运行
     """
     win32api.ShellExecute(
-        0, 'open', exe_path, '', os.path.dirname(exe_path), 1
+        0, 'open', exe_path, '', exe_path, 1
     )
 
 class WSClient:
@@ -69,18 +69,17 @@ class AnalyseIni():
         temp_dict = {}
         configer = configparser.ConfigParser()
 
-        configer.read(self.inifile, encoding='UTF-8')
+        configer.read(self.inifile, encoding='UTF-16')
         for key in configer.sections() :
             subdict = {}
             for subkey in configer.options(key):
                 subdict.update({"{}".format(subkey):"{}".format(configer.get(key,subkey)) })
-
             temp_dict["{}".format(key)] = subdict
         return temp_dict
 
 def read_to_list(file_path):
     temp_list =[]
-    for line in open(file_path):
+    for line in open(file_path,encoding='UTF-8-sig'):
         line = line.strip('\n')
         temp_list.append(line)
     return temp_list
@@ -102,11 +101,12 @@ def run():
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", dest="status", help="get client status ")
     parser.add_argument("-f", dest="file_path", help="the configure file path ")
-    parser.add_argument("-zip",dest="create_zip", help="Crate the zip file for job ")
+    parser.add_argument("-zip", dest="create_zip", help="Crate the zip file for job ")
     results = parser.parse_args()
     # 初始化
     try:
         web_client = WSClient()
+        # start_exe()
     except:
         print ( "204")
         exit(204)
@@ -118,11 +118,11 @@ def run():
         json_data = AnalyseIni(results.file_path).ini_to_json()
         zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
         zip_path = results.create_zip
-        # print(zip_path)
+
         create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
         if create_zipfile_result == "Successful":
-            pass
-            # # os.remove(results.file_path)
+            # pass
+            os.remove(results.file_path)
         else:
             return "205"
 
