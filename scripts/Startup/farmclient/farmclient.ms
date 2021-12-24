@@ -29,7 +29,7 @@ myAppDataDirName = getINISetting myIniFilePath "clientinfo" "appdatadirname"
 myAppFileName = getINISetting myIniFilePath "clientinfo" "appfilename"
 myAppRegistryname = getINISetting myIniFilePath "clientinfo" "registryname"
 myAppName = getINISetting myIniFilePath "clientinfo" "name"
-if myAppName == "" then (
+if myAppName != undefined or myAppName == "" then (
     myAppName = "FarmClient"
 )
 
@@ -856,7 +856,8 @@ function QueryBoxWithTextbox parentHwnd strTitle strFilesList YesText:unsupplied
 function modifyOutputGamma args =
 (
     local value = args.Item["gamma_fileout_value"]
-    resetOutGamma = value
+    IDisplayGamma.colorCorrectionMode = #gamma
+    fileOutGamma = value
 )
 
 function getFirstEngineIndex name = (
@@ -909,7 +910,239 @@ function modifyVraySetting args =
             vr.imageSampler_renderMask_type = 0
         )
     ) catch()
+
+
+    local aochannel = args.Item["aochannel_enable"]
+    local colorchannel = args.Item["colorchannel_enable"]
+    local mtlchannel = args.Item["mtlchannel_enable"]
+
+    if aochannel then (
+        addAOChannel args
+    )
+
+    if colorchannel then (
+        addColorChannel args
+    )
+
+    if mtlchannel then (
+        if (addMtlChannel args) then(
+            setMtlChannelId()
+        )
+    )
+
+    try (  -- 单独的渲染通道
+        if aochannel or colorchannel then (
+            if vr.output_on and (not vr.output_useram) then (
+                vr.output_useram = true
+            )
+        )
+
+        if vr.output_on and vr.output_useram then (
+            local bmp
+            if vr.output_getsetsfrommax then (
+                bmp = bitmap renderWidth renderHeight
+            ) else (
+                bmp = bitmap vr.output_width vr.output_height
+            )
+            local tmpfile = (GetDir #temp) + "\\kx-tmp-bmp-" + (getFilenameFile rendOutputFilename) +  (getFilenameType rendoutputfilename)
+            bmp.filename = tmpfile
+            save bmp
+            close bmp
+            deleteFile tmpfile
+            vr.output_splitbitmap = bmp
+            vr.output_splitgbuffer = true
+            vr.output_splitRGB = true
+
+            local deleteOtherChannel = args.Item["delete_other_channel"]
+            if deleteOtherChannel then (
+                vr.output_splitAlpha = false
+            )
+
+            local originalFileExt = toUpper(getFilenameType rendOutputFilename)
+            local splitFilename = "c:\\000_kx_vray_framebuf" + originalFileExt
+            vr.output_splitfilename = splitFilename
+        )
+    ) catch()
+
+    -- GI 自动保存 强制不勾选
+    try (
+        try(vr.adv_irradmap_autoSave = false)catch()
+        try(vr.lightcache_autoSave = false)catch()
+    )catch()
     true
+)
+
+
+
+function getCoronaTex = (
+    try ( return (Ctexmap elementname:"aotexture") ) catch ()
+    try ( return (C_纹理图 elementname:"aotexture")) catch ()
+    try ( return (CTexmapC_纹理图 elementname:"aotexture")) catch ()
+    try ( return (C纹理 elementname:"aotexture")) catch ()
+    try ( return (C纹理图 elementname:"aotexture")) catch ()
+    undefined
+)
+
+function getCoronaAOMap = (
+    try ( return (CoronaAO elementname:"aodirt") ) catch ()
+    try ( return (C_污垢_AO_环境光吸收 elementname:"aodirt")) catch ()
+    try ( return (CR_AO elementname:"aodirt")) catch ()
+    try ( return (C_AO elementname:"aodirt")) catch ()
+    try ( return (Corona_环境阻光 elementname:"aodirt")) catch ()
+    try ( return (Corona_AO elementname:"aodirt")) catch ()
+    undefined
+)
+
+function addCoronaAOChannel args = (
+    local rem = MaxOps.GetCurRenderElementMgr()
+    if (rem == undefined) then (
+        return true
+    )
+
+    local aoRadiu = args.Item["aochannel_radiu"]
+
+    try (
+        rem.SetElementsActive(true)
+        local aochannel = getCoronaTex()
+        local dirt = getCoronaAOMap()
+        dirt.maxDistance = aoRadiu
+        aochannel.texmap = dirt
+        try(
+            aochannel.elementname = "AO"
+        )catch(
+            try(
+                aochannel.elementName = "AO"
+            )catch(
+                return false
+            )
+        )
+
+        try (aochannel.filterOn  = true) catch()
+        try (aochannel.filter_on  = true) catch()
+        rem.AddRenderElement(aochannel)
+        return true
+    ) catch (
+        return false
+    )
+)
+
+function getCoronaMaskID =
+(
+    try ( return (CMasking_ID elementname:"colorchannel") ) catch ()
+    try ( return (C_遮罩_ID elementname:"colorchannel")) catch ()
+    try ( return (CMasking_IDC_遮罩_ID elementname:"colorchannel")) catch ()
+    try ( return (遮罩_ID elementname:"colorchannel")) catch ()
+    try ( return (C遮罩_ID elementname:"colorchannel")) catch ()
+    undefined
+)
+
+function addCoronaColorChannel args =
+(
+    local rem = MaxOps.GetCurRenderElementMgr()
+    if (rem == undefined) then (
+        return true
+    )
+    try (
+        rem.SetElementsActive(true)
+        local colorchannel = getCoronaMaskID()
+        colorchannel.what = 2
+        try(
+            colorchannel.elementname = "Color"
+        )catch(
+            try(
+                colorchannel.elementName = "Color"
+            )catch(
+            return false
+            )
+        )
+
+        rem.AddRenderElement(colorchannel)
+        try (colorchannel.filterOn  = true) catch()
+        try (colorchannel.filter_on = true) catch()
+        return true
+    ) catch(
+        return false
+    )
+)
+
+function getCoronaMtlID =
+(
+    try ( return (CMasking_ID elementname:"colorchannel") ) catch ()
+    try ( return (C_遮罩_ID elementname:"colorchannel")) catch ()
+    try ( return (CMasking_IDC_遮罩_ID elementname:"colorchannel")) catch ()
+    try ( return (遮罩_ID elementname:"colorchannel")) catch ()
+    try ( return (C遮罩_ID elementname:"colorchannel")) catch ()
+    undefined
+)
+
+function addCoronaMtlChannel args =
+(
+    local rem = MaxOps.GetCurRenderElementMgr()
+    if (rem == undefined) then (
+        return true
+    )
+    try (
+        rem.SetElementsActive(true)
+        local mtlchannel = getCoronaMtlID()
+        mtlchannel.what = 3
+
+        try(
+            mtlchannel.elementname = "material"
+        )catch(
+            try(
+                mtlchannel.elementName = "material"
+            )catch(
+                return false
+            )
+        )
+
+        rem.AddRenderElement(mtlchannel)
+        try (mtlchannel.filterOn  = true) catch()
+        try (mtlchannel.filter_on = true) catch()
+        return true
+    ) catch(
+        return false
+    )
+)
+
+fn setCrMtlChannelIdCore m = (
+
+try(
+    if(m.renderElementPropagation == 3)then(
+        m.renderElementPropagation = 0
+    )
+)catch()
+
+local count = (getNumSubMtls m)
+if count > 0 then (
+    for i =1 to count do (
+        local subm = (getSubMtl m i)
+        setMtlChannelIdCore subm
+    )
+)
+)
+
+function setCrMtlChannelId = (
+local mtlChannelMap = dotNetObject "System.Collections.Hashtable"
+local mats = sceneMaterials
+for m in mats do (
+    try (
+        setCrMtlChannelIdCore m
+    ) catch ()
+)
+)
+function fixCoronaJPGFileIssue =
+(
+    try (
+        local last = rendoutputfilename[rendoutputfilename.count]
+        local lastUpper = toUpper last
+        local lastLower = toLower last
+        if lastLower != lastUpper then ( -- 是合法字符
+            return true
+        )
+        rendoutputfilename = substring rendoutputfilename 1 (rendoutputfilename.count-1)
+    ) catch (
+    )
 )
 
 function modifyCoronaRendererSetting args =
@@ -918,6 +1151,25 @@ function modifyCoronaRendererSetting args =
     try ( cr.dr_enable = false ) catch()
     try ( cr.dr_slaveAddresses = #() ) catch()
     try ( cr.dr_slaveResolvedNames = #() ) catch()
+    try (
+        if cr.adaptivity_targetError < 0.01 then (
+            cr.adaptivity_targetError = 0.01
+        )
+
+        local seconds = (cr.progressive_timeLimit/1000)
+        if seconds > 86400 or seconds == 0 then (
+            cr.progressive_timeLimit = 86400 *1000
+        )
+    ) catch (
+        if cr.Target_image_noise_level__error < 0.01 then (
+            cr.Target_image_noise_level__error = 0.01
+        )
+
+        local seconds = (cr.main_timeLimit/1000)
+        if seconds > 86400 or seconds == 0 then (
+            cr.main_timeLimit = 86400 *1000
+        )
+    )
 
     try(
         if cr.renderSelected_mode == 1 then(
@@ -925,6 +1177,39 @@ function modifyCoronaRendererSetting args =
         )
     )catch()
 
+    fixCoronaJPGFileIssue()
+
+
+    -- 区域渲染+UHD Cache 会出错
+    local renderType = (getRenderType() as string)
+    renderType = tolower renderType
+    try(
+        if renderType == "region" and cr.shading_secondarySolver == 4 then (
+            if(renderers.current.system_vfbRegions.count < 4)then(
+                local region = viewport.getRegionRect(viewport.activeViewport)
+                renderers.current.system_vfbRegions_enabled = true
+                renderers.current.system_vfbRegions = #([renderWidth,renderHeight,0], [0,0,0], [renderWidth,renderHeight,0], [region.left,region.top,0], [region.right,region.bottom,0], [0,0,0])
+            )
+            setRenderType #view
+        )
+    )catch()
+
+    local aochannel = args.Item["aochannel_enable"]
+    local colorchannel = args.Item["colorchannel_enable"]
+    local mtlchannel = args.Item["mtlchannel_enable"]
+
+    if aochannel then (
+        addCoronaAOChannel args
+    )
+
+    if colorchannel then (
+        addCoronaColorChannel args
+        setCrMtlChannelId()
+    )
+
+    if mtlchannel then (
+        addCoronaMtlChannel args
+    )
     true
 )
 
@@ -1008,7 +1293,7 @@ function getCoronaFiles =
     files
 )
 
-function createZipFilesList tempdir strtime extralFiles renderName =
+function createZipFilesList tempdir strtime  renderName =
 (
     local allAssetfiles = #()
     ATSOps.Refresh()
@@ -1037,17 +1322,17 @@ function createZipFilesList tempdir strtime extralFiles renderName =
         format str to:stream
     )
 
-    if extralFiles != undefined then (
-        for i = 1 to extralFiles.count do (
-            if (StringEndsWith extralFiles[i] "\\") then (
-                str = extralFiles[i]+"\n"
-            ) else (
-                str = extralFiles[i]+"|\n"
-            )
-            str = substituteString str "%" "\%"
-            format str to:stream
-        )
-    )
+    -- if extralFiles != undefined then (
+    --     for i = 1 to extralFiles.count do (
+    --         if (StringEndsWith extralFiles[i] "\\") then (
+    --             str = extralFiles[i]+"\n"
+    --         ) else (
+    --             str = extralFiles[i]+"|\n"
+    --         )
+    --         str = substituteString str "%" "\%"
+    --         format str to:stream
+    --     )
+    -- )
 
     if renderName == "corona" then (
         local coronaFiles = getCoronaFiles()
@@ -1298,10 +1583,10 @@ function isSceneUseCorona =
     false
 )
 
-function createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout cameraList taskFrame lightRate freemode resetOutGamma args =
+function createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout cameraList taskFrame lightRate freemode fileOutGamma args =
 (
 
-    local tempIniFilePath = tempDir + "kx-task-" + strtime + ".ini"
+    local tempIniFilePath = tempDir + "renderfarm-task-" + strtime + ".ini"
     print tempIniFilePath
     --deleteFile tempIniFilePath
 
@@ -1350,7 +1635,7 @@ function createIniFile tempdir strtime tempFilesListPath outputFilename machineL
     setINISetting tempIniFilePath "Arguments" "renderoutputfilename" outputFilename
     setINISetting tempIniFilePath "Arguments" "machinelimit" (machineLimit as string)
     setINISetting tempIniFilePath "Arguments" "tasktimeoutminutes" (taskTimeout as string)
-    setINISetting tempIniFilePath "Arguments" "fileOutGamma" (resetOutGamma as string)
+    setINISetting tempIniFilePath "Arguments" "fileOutGamma" (fileoutgamma as string)
 
     --setINISetting tempIniFilePath "Arguments" "cameras" (cameraList as string)
     local camera_index = 0
@@ -1370,7 +1655,8 @@ function createIniFile tempdir strtime tempFilesListPath outputFilename machineL
     setINISetting tempIniFilePath "Properties" "renderheight" (renderHeight as string)
     setINISetting tempIniFilePath "Properties" "freemode" freemode
     setINISetting tempIniFilePath "Properties" "language" language
-    setINISetting tempIniFilePath "Properties" "previewframes" args.Item["previewframes"]
+
+	setINISetting tempIniFilePath "Properties" "previewframes" args.Item["previewframes"]
     setINISetting tempIniFilePath "Properties" "stopafterpreviewframes" (args.Item["stopafterpreviewframes"] as string)
     setINISetting tempIniFilePath "Properties" "numatmospherics" (numAtmospherics as string)
     setINISetting tempIniFilePath "Properties" "rendoutputfilename" rendOutputFilename
@@ -1380,6 +1666,16 @@ function createIniFile tempdir strtime tempFilesListPath outputFilename machineL
         setINISetting tempIniFilePath "Properties" "_time_limit" (args.Item["time_limit"] as string)
         setINISetting tempIniFilePath "Properties" "_noise_level_limit" (args.Item["noise_level_limit"] as string)
     )
+
+    setINISetting tempIniFilePath "Properties" "aochannel_enable" (args.Item["aochannel_enable"] as string)
+    if args.Item["aochannel_enable"] then (
+        setINISetting tempIniFilePath "Properties" "aochannel_radiu" (args.Item["aochannel_radiu"] as string)
+        setINISetting tempIniFilePath "Properties" "aochannel_subdiv" (args.Item["aochannel_subdiv"] as string)
+    )
+    setINISetting tempIniFilePath "Properties" "colorchannel_enable" (args.Item["colorchannel_enable"] as string)
+    setINISetting tempIniFilePath "Properties" "mtlchannel_enable" (args.Item["mtlchannel_enable"] as string)
+    -- setINISetting tempIniFilePath "Properties" "delete_other_channel" (args.Item["delete_other_channel"] as string)
+
 
     setINISetting tempIniFilePath "Properties" "vrayoriginalstring" (renderers.current as string)
     setINISetting tempIniFilePath "Properties" "rendatmosphere" (rendAtmosphere as string)
@@ -1902,10 +2198,419 @@ fn download externalfile ad_adress =
 	webClient.DownloadFile theUri ad_adress
 )
 
+function getAORadiuCaption rendererName =
+(
+    if rendererName == "vray" then (
+        return "半径："
+    ) else (
+        return "最大距离："
+    )
+)
+function getCurrentRendererName =
+(
+    local currentRenderer = renderers.current as string
 
+    if (findstring currentRenderer "CoronaRenderer") != undefined then (
+        return "corona"
+    )
+
+    if (findstring currentRenderer "FStormRender") != undefined then (
+        return "fstorm"
+    )
+
+    if (findstring currentRenderer "V_Ray_") != undefined then (
+        return "vray"
+    )
+    currentRenderer
+)
+function checkMixupMtl renderName =
+(
+    local crMtl =  #("CoronaMtl","CoronaLightMtl","CoronaLayeredMtl","CoronaRaySwitchMtl","CoronaHairMtl","CoronaPortalMtl","CoronaSelectMtl","CoronaShadowCatcherMtl","CoronaSkinMtl","CoronaVolumeMtl")
+    local vrMtl = #("MDL材质","VRayGLSLMtl","VRayMtl","VRayMtl转换器","VRayOSLMtl","VRayScannedMtl","VRayVRmatMtl","共生材质","凸凹材质","双面材质","向量置换烘焙","安德斯_兰戈兰","快速SSS2","散布体积","毛发材质","混合材质","灯光材质","点粒子材质","蒙皮材质","薄片材质","覆盖材质","车漆材质","随机薄片材质")
+    local vrMtl2 = #("VRay2SidedMtl","VRayALSurfaceMtl","VRayBlendMtl","VRayBumpMtl","VRayCarPaintMtl","VRayFastSSS2","VRayFlakesMtl","VRayHairMtl","VRayHairNextMtl","VRayLightMtl","VRayMDLMtl","VRayMtlWrapper","VRayOverrideMtl","VRayPluginNodeMtl","VRayPointParticleMtl","VRayScatterVolume","VRayStochasticFlakesMtl","VRaySwitchMtl","VRayToonMtl","VRayVectorDisplBake")
+
+    local mtlArray = #()
+    local foundMixupMtl = false
+    local msg = ""
+    local code = ""
+    if (renderName == "vray") then (
+        mtlArray = crMtl
+        msg = "当前渲染器是VRay，模型用到了CR(Corona Renderer)的材质"
+        code = "26"
+    ) else if renderName == "corona" then (
+        join vrMtl vrMtl2
+        mtlArray = vrMtl
+        msg = "当前渲染器是CR(Corona Renderer)，模型用到了VRay的材质"
+        code = "27"
+    ) else (
+        return #("","")
+    )
+
+    for mtlObject in sceneMaterials do (
+        className = (classof mtlObject) as string
+        if (findItem mtlArray className) > 0 then (
+            foundMixupMtl = true
+            exit
+        )
+    )
+
+    if not foundMixupMtl then (
+        return #("","")
+    )
+    msg += "，可能导致颜色通道渲染结果不正确。\r\n"
+    return #(msg,code)
+)
+
+function canUseAOChannel = (
+    local aochannel = getVRayExtraTex()
+    local dirt = getVRayDirt()
+    local strMaxVersion = getMaxVersion()
+    if strMaxVersion == "2012" or strMaxVersion == "2013" or strMaxVersion == "2014" then (
+        return (aochannel != undefined and dirt != undefined)
+    )
+    true
+)
+
+function addAOChannel args = (
+    local rem = MaxOps.GetCurRenderElementMgr()
+    if (rem == undefined) then (
+        return true
+    )
+
+    local aoRadiu = args.Item["aochannel_radiu"]
+    -- local aoSubdiv = args.Item["aochannel_subdiv"]
+
+    try (
+        rem.SetElementsActive(true)
+        local aochannel = getVRayExtraTex()
+        local dirt = getVRayDirt()
+        setVRayExtraTex aochannel dirt
+        setVRayDirtInfo dirt aoRadiu aoSubdiv
+
+        try(
+            aochannel.elementname = "ao"
+        )catch(
+            try(
+                aochannel.elementName = "ao"
+            )catch(
+                return false
+            )
+        )
+
+        try (aochannel.filterOn  = true) catch()
+        try (aochannel.filter_on  = true) catch()
+        rem.AddRenderElement(aochannel)
+        return true
+    ) catch (
+        return false
+    )
+)
+
+function getVRayWireColor = (
+    try ( return (VRayWireColor elementname:"VRayWireColor") ) catch ()
+    try ( return (VRay_WireColor elementname:"VRayWireColor") ) catch ()
+    try ( return (VRay_线框颜色 elementname:"VRayWireColor") ) catch ()
+    try ( return (VRay线框颜色 elementname:"VRayWireColor") ) catch ()
+    try ( return (VR_线框颜色 elementname:"VRayWireColor") ) catch ()
+    try ( return (线框颜色 elementname:"VRayWireColor") ) catch ()
+    undefined
+)
+
+function getVRayObjectID = (
+    try ( return (VRayObjectID elementname:"VRayObjectID") ) catch ()
+    try ( return (VRay_ObjectID elementname:"VRayObjectID") ) catch ()
+    try ( return (VRay_对象_ID elementname:"VRayObjectID")) catch ()
+    try ( return (VRay_对象ID elementname:"VRayObjectID")) catch ()
+    try ( return (VRay对象ID elementname:"VRayObjectID") ) catch ()
+    try ( return (VR_对象ID elementname:"VRayObjectID") ) catch ()
+    try ( return (VR_物体ID elementname:"VRayObjectID") ) catch ()
+    try ( return (对象_ID elementname:"VRayObjectID") ) catch ()
+    undefined
+)
+
+function setVRayObjectIDOutputType obj type = (
+    try (
+        try (
+            obj.output_type = type
+        ) catch (
+            obj.输出类型 = type
+        )
+    ) catch ()
+    )
+
+    struct objcolor (
+    color	= undefined,
+    id		= undefined
+    )
+    global objcolors = #()
+
+    function saveObjectColor color = (
+    for c in objcolors do (
+        if (c.color == color) then (
+            return undefined
+        )
+    )
+    append objcolors (objcolor color:color id:(objcolors.count))
+)
+
+function getObjectColor color = (
+    for c in objcolors do (
+        if (c.color == color) then (
+            return c.id
+        )
+    )
+    return undefined
+)
+
+function resetObjectID = (
+    try (
+        local objectsList = #()
+        local geo = #()
+        for obj in geometry where classof obj != BoneGeometry do (
+            append geo obj
+        )
+
+        local shapesArray = shapes as array
+        objectsList = geo + shapesArray
+
+        for o in objectsList do (
+            saveObjectColor(o.material)
+        )
+
+        for o in objectsList do (
+            o.gbufferChannel = getObjectColor(o.material)
+        )
+    ) catch ()
+)
+
+function canUseColorChannel = (
+    local vrayobj = getVRayWireColor()
+    if vrayobj == undefined then (
+        vrayobj = getVRayObjectID()
+)
+
+local strMaxVersion = getMaxVersion()
+    if strMaxVersion == "2012" or strMaxVersion == "2013" or strMaxVersion == "2014" then (
+        return (vrayobj != undefined)
+    )
+    true
+)
+
+function addColorChannel args = (
+    local rem = MaxOps.GetCurRenderElementMgr()
+    if (rem == undefined) then (
+        return true
+    )
+
+    try (
+        rem.SetElementsActive(true)
+
+        local strMaxVersion = getMaxVersion()
+        local strVrayVersion = (renderers.current as string)
+        local isVRay210 = (StringStartWith strVrayVersion "V_Ray_Adv_2_10") or (StringStartWith strVrayVersion "V_Ray_Adv_2_00")
+
+        local useWireColor = false
+        if strMaxVersion == "2012" and isVRay210 then (
+            useWireColor = true
+        )
+
+        if useWireColor then (
+            local vrayobj = getVRayWireColor()
+            if vrayobj != undefined then (
+                vrayobj.elementname = "color"
+                try (vrayobj.filterOn  = true) catch()
+                try (vrayobj.filter_on  = true) catch()
+                rem.AddRenderElement(vrayobj)
+            )
+        ) else (
+            local vrayobj = getVRayObjectID()
+            local isWireColor = false
+            if vrayobj == undefined then (
+                vrayobj = getVRayWireColor()
+                isWireColor = true
+            ) else (
+                resetObjectID()
+                setVRayObjectIDOutputType vrayobj 1
+            )
+            if vrayobj != undefined then (
+                try(
+                    vrayobj.elementname = "color"
+                )catch(
+                    try(
+                        vrayobj.elementName = "color"
+                    )catch(
+                        return false
+                    )
+                )
+
+                try(
+                    vrayobj.output_type  = 1
+                )catch(
+                    try(vrayobj.输出类型 = 1)catch()
+                )
+                try (vrayobj.filterOn  = true) catch()
+                try (vrayobj.filter_on  = true) catch()
+                rem.AddRenderElement(vrayobj)
+            )
+            if not isWireColor then (
+                vrayobj = getVRayWireColor()
+                if vrayobj != undefined then (
+                    vrayobj.elementname = "color2"
+                    try (vrayobj.filterOn = true) catch()
+                    try (vrayobj.filter_on = true) catch()
+                    rem.AddRenderElement(vrayobj)
+                )
+            )
+        )
+
+        return true
+    ) catch (
+        return false
+    )
+)
+
+function getVrayMtlID =
+(
+    try ( return (VRayMtlID elementname:"VRayMtlID") ) catch ()
+    try ( return (VRay_材质ID elementname:"VRayMtlID") ) catch ()
+    try ( return (VRay_材质_ID elementname:"VRayMtlID") ) catch ()
+    try ( return (VRay_MtlID elementname:"VRayMtlID") ) catch ()
+    try ( return (VRay材质ID elementname:"VRayMtlID") ) catch ()
+    try ( return (VR_材质ID elementname:"VRayMtlID") ) catch ()
+    try ( return (材质_ID elementname:"VRayMtlID") ) catch ()
+    undefined
+)
+
+function addMtlChannel args = (
+    local rem = MaxOps.GetCurRenderElementMgr()
+    if (rem == undefined) then (
+        return true
+    )
+
+    try (
+        rem.SetElementsActive(true)
+        local mtlchannel = getVrayMtlID()
+        try(
+            mtlchannel.elementname = "material"
+        )catch(
+            try(
+                mtlchannel.elementName = "material"
+            )catch(
+                return false
+            )
+        )
+
+        try(
+            mtlchannel.output_type = 1
+        )catch(
+            try(mtlchannel.输出类型 = 1)catch()
+        )
+
+        rem.AddRenderElement(mtlchannel)
+        try (mtlchannel.filterOn  = true) catch()
+        try (mtlchannel.filter_on = true) catch()
+        return true
+    ) catch (
+        return false
+    )
+)
+
+fn setMtlChannelIdCore m mtlChannelMap &mtlIdIndex = (
+
+    if mtlIdIndex >= 15 then(
+        mtlIdIndex = 1
+    )
+
+    m.effectsChannel = mtlIdIndex
+    mtlIdIndex += 1
+
+    local count = (getNumSubMtls m)
+    if count > 0 then (
+        for i =1 to count do (
+            local subm = (getSubMtl m i)
+            setMtlChannelIdCore subm mtlChannelMap &mtlIdIndex
+        )
+    )
+)
+
+function setMtlChannelId = (
+    local mtlChannelMap = dotNetObject "System.Collections.Hashtable"
+    local mats = sceneMaterials
+    local mtlIdIndex = 1
+    for m in mats do (
+        try (
+            setMtlChannelIdCore m mtlChannelMap &mtlIdIndex
+        ) catch ()
+    )
+)
+
+function canUsMtlChannel = (
+    local vrayobj = getVrayMtlID()
+
+    local strMaxVersion = getMaxVersion()
+    if strMaxVersion == "2012" or strMaxVersion == "2013" or strMaxVersion == "2014" then (
+        return (vrayobj != undefined)
+    )
+    true
+)
+
+function loadUserSetting rendererName  = (
+    local userSettingFile = getUserSettingFilePath()
+    local args = dotNetObject "System.Collections.Hashtable"
+
+    if not (doesFileExist userSettingFile) then (
+        return args
+    )
+
+    try (
+        local value = (getINISetting userSettingFile rendererName "speedIndex") as integer
+        if value == 0 then (
+            return args
+        )
+        if value < 1 or value > 3 then (
+            value = 1
+        )
+        args.Add "speedIndex"  value
+
+        args.Add "taskTimeout" ((getINISetting userSettingFile rendererName "taskTimeout") as Integer)
+        args.Add "use_client_savepath" ((getINISetting userSettingFile rendererName "use_client_savepath") as booleanClass)
+        args.Add "aochannel_enable" ((getINISetting userSettingFile rendererName "aochannel_enable") as booleanClass)
+        args.Add "colorchannel_enable" ((getINISetting userSettingFile rendererName "colorchannel_enable") as booleanClass)
+        args.Add "mtlchannel_enable" ((getINISetting userSettingFile rendererName "mtlchannel_enable") as booleanClass)
+        -- args.Add "delete_other_channel" ((getINISetting userSettingFile rendererName "delete_other_channel") as booleanClass)
+        args.Add "use_new_render_mode" ((getINISetting userSettingFile rendererName "use_new_render_mode") as booleanClass)
+
+        if rendererName == "vray" then (
+            args.Add "use_latest_vray" ((getINISetting userSettingFile "vray" "use_latest_vray") as booleanClass)
+            args.Add "lightjob_enabled" ((getINISetting userSettingFile "vray" "lightjob_enabled") as booleanClass)
+            if (args.Item["lightjob_enabled"]) then (
+                args.Add "lightjob_firstengine" ((getINISetting userSettingFile "vray" "lightjob_firstengine") as Integer)
+                args.Add "lightjob_secondengine" ((getINISetting userSettingFile "vray" "lightjob_secondengine") as Integer)
+                args.Add "lightrate" ((getINISetting userSettingFile "vray" "lightrate") as Integer)
+            )
+        )
+        return args
+    ) catch(
+        return args
+    )
+)
+
+function getUserSettingValue setting key defaultValue =
+(
+    local value = setting.Item[key]
+    if value == undefined then (
+        value = defaultValue
+    )
+    value
+)
 
 rollout renderfarmSetting "渲染设置" width:500 height:660
 (
+    local rendererName = getCurrentRendererName()
+    -- AO 半径默认设置为100
+    local AORadiu = 100
+    local aoRadiuCaption = getAORadiuCaption(rendererName)
+
     local lastRendImageAspectRatio = rendImageAspectRatio
     local strMaxVersion = "3ds Max " + getMaxVersion()
     local coronaRendererVersion = ""
@@ -1914,7 +2619,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     local vrayVersion = ""
     local settingChanged = false
     local strRendererVersion = ""
-    local imagePath = local_image
+
     local iniFilePath = (scriptSelfDir + "\\setting.ini")
     local taskIniFilePath = ""
     local extList = #("TGA","JPG","EXR","PNG","TIF","BMP", "RPF")
@@ -1934,7 +2639,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     local tooltipLight = "先渲染光子，再渲染成图，用来节省渲染时间。"
     local tooltipFrameList = "帧序列示例：\r\n渲染第5和10和15帧例：5 10 15 或5,10,15，空格或者逗号分隔\r\n渲染第1帧到第100帧例：1-100，减号分隔\r\n渲染第1帧到第100帧，隔5帧渲染1帧(1, 6, 11, 16)例：1-100:5 一种格式"
 
-    button btnAD "xxx" width:500 height:100 images:#(imagePath, undefined,1,1,1,1,1)
+    button btnAD "xxx" width:500 height:100 images:#(local_image, undefined,1,1,1,1,1)
 
     group "软件配置"
     (
@@ -1953,7 +2658,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     group "帧序列配置"
     (
         edittext editFrames "帧序列:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,225] labelOnTop:false height:20
-        button labelFrameHelp "帧序列和优先帧的格式与3dsmax标准格式相同" tooltip:tooltipFrameList pos:[221,225] border:false
+        button labelFrameHelp "帧序列的格式与3dsmax标准格式相同" tooltip:tooltipFrameList pos:[221,225] border:false
+        --  先隐藏掉优先帧设置
         edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20
         checkbox checkboxPreviewStop "优先帧渲染完成后暂停" pos:[220,250] height:20
     )
@@ -1971,10 +2677,11 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         dropdownlist dropdownlistFileExt items:extList pos:[90,488] width:100
         --spinner spTaskTimeout  "超时时间(小时)：" toolTip:tooltipTimeout fieldwidth:40 align:#left pos:[300,490] range:[1,24,24] type:#integer height:20
         --label labelAddonDir "缓存文件夹"  pos:[20,515]
-        button btnAddonDir "缓存文件夹" toolTip:tooltipAddonDir border:false pos:[14,515]
-        dropdownlist dropdownlistAddonDir pos:[90,513] width:260
-        button btnAddDir "添加"  pos:[370,513]
-        button btnDeleteDir "删除"  pos:[430,513]
+        -- 隐藏缓存文件夹
+        -- button btnAddonDir "缓存文件夹" toolTip:tooltipAddonDir border:false pos:[14,515]
+        -- dropdownlist dropdownlistAddonDir pos:[90,513] width:260
+        -- button btnAddDir "添加"  pos:[370,513]
+        -- button btnDeleteDir "删除"  pos:[430,513]
 
         checkbox checkboxLight "先渲染光子" toolTip:tooltipLight checked:false fieldwidth:40 align:#left pos:[20,539]
         label labelFirstEngine "首次引擎"  pos:[110,540]
@@ -1986,13 +2693,25 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         edittext editLightFrames "光子帧序列:" fieldWidth:150 pos:[20,565] labelOnTop:false height:16
         spinner spLightFrame  "每N帧渲染一次光子：" fieldwidth:30 align:#left pos:[330,565] range:[1,1000,1] type:#integer
 
-        spinner spPassLimit "        过程限制：" align:#left pos:[20,540] range:[0,1048576,0] type:#integer height:20 width:80
-        spinner spTimeHourLimit "时限：" align:#left pos:[250,540] range:[0,239,0] type:#integer height:20 width:45
-        label labelHour "时" pos:[330,540]
-        spinner spTimeMinuteLimit "" align:#left pos:[350,540] range:[0,59,0] type:#integer height:20 width:40
-        label labelMinute "分" pos:[400,540]
-        spinner spTimeSecondLimit "" align:#left pos:[420,540] range:[0,59,0] type:#integer height:20 width:40
-        label labelSecond "秒" pos:[470,540]
+        -- 增加通道
+        checkbox checkboxColor "颜色通道图" align:#left  pos:[20,520]
+        checkbox checkboxMtl "材质通道图" align:#left  pos:[110,520]
+        checkbox checkboxAO "AO图"  pos:[200,520]
+
+        spinner spRadiu  aoRadiuCaption  align:#left pos:[260,520] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
+        spinner spSubdiv "细分：" align:#left pos:[400,520] range:[1,1000,16] type:#integer height:20 width:50
+
+        -- 增加通道结束
+
+
+        spinner spPassLimit "        过程限制：" align:#left pos:[20,543] range:[0,1048576,0] type:#integer height:20 width:80
+        spinner spTimeHourLimit "时限：" align:#left pos:[250,543] range:[0,239,0] type:#integer height:20 width:45
+
+        label labelHour "时" pos:[330,543]
+        spinner spTimeMinuteLimit "" align:#left pos:[350,543] range:[0,59,0] type:#integer height:20 width:40
+        label labelMinute "分" pos:[400,543]
+        spinner spTimeSecondLimit "" align:#left pos:[420,543] range:[0,59,0] type:#integer height:20 width:40
+        label labelSecond "秒" pos:[470,543]
         spinner spNoiseLimit "噪点等级限制：" align:#left pos:[20,565] range:[0,1000.0,0] type:#float height:20 width:80
 
         checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,590]
@@ -2037,6 +2756,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     )
 
     on renderfarmSetting open do (
+
         try (
             if renderSceneDialog.isOpen() then (
                 renderSceneDialog.close()
@@ -2151,7 +2871,79 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
                 spTimeSecondLimit.visible = false
                 labelSecond.visible = false
                 spNoiseLimit.visible = false
+                ---------------------------------------
+                local version = filterString vrayVersion "."
+                -- if version[1] == "5" then(
+                --     print "debug lut "
+                --     btnFileLutPath.visible = true
+                --     editFileLutPath.visible = true
+                --     btnSelectFileLutpath.visible = true
+                --     btnRemoveFileLutpath.visible = true
+                -- )
+
+                if (version[1] as Integer) < 4 then (
+                    firstEngineNameList = #("发光图","光子贴图","BF算法(暴力计算)","灯光缓存")
+                    firstEngineList = #("irradiancemap","photonmap","bruteforce", "lightcache")
+                    secondEngineNameList = #("无","光子贴图","BF算法(暴力计算)","灯光缓存")
+                    secondEngineList = #("none","photonmap","bruteforce","lightcache")
+
+                    dropdownlistFirstEngine.items = firstEngineNameList
+                    dropdownlistSecondEngine.items = secondEngineNameList
+                )
+
+                local cannotUseAOChannel = false
+                local cannotUseColorChannel = false
+                local cannotUseMtlChannel = false
+                if not canUseAOChannel() then (
+                    checkboxAO.enabled = false
+                    spRadiu.enabled = false
+                    spSubdiv.enabled = false
+                    cannotUseAOChannel = true
+                ) else (
+                    try (checkboxAO.checked = getUserSettingValue userSetting "aochannel_enable" false) catch ()
+                )
+                if not canUseColorChannel() then (
+                    checkboxColor.enabled = false
+                    cannotUseColorChannel = true
+                ) else (
+                    try (checkboxColor.checked = getUserSettingValue userSetting "colorchannel_enable" false) catch ()
+                )
+
+                if not canUsMtlChannel() then (
+                    checkboxMtl.enabled = false
+                    cannotUseMtlChannel = true
+                ) else (
+                    try (checkboxMtl.checked = getUserSettingValue userSetting "mtlchannel_enable" false) catch ()
+                )
+
+                local msg = "由于VRay版本问题，"
+                if cannotUseAOChannel and cannotUseColorChannel and cannotUseMtlChannel then (
+                    msg += "一键AO通道，颜色通道和材质通道功能不可用"
+                ) else if cannotUseAOChannel then (
+                    msg += "一键AO通道功能不可用"
+                ) else if cannotUseColorChannel then (
+                    msg += "一键颜色通道功能不可用"
+                ) else if cannotUseMtlChannel then (
+                    msg += "一键材质通道功能不可用"
+                ) else (
+                    msg = ""
+                )
+                if msg.count > 0 then (
+                    msg += "，请联系客服解决。"
+                    MessageBox msg  title:myAppName
+                )
+                ---------------------------------------
+
+
             ) else (
+
+                editLightFrames.visible = false
+                spLightFrame.visible = false
+
+                labelLightRate.visible = false
+
+                spSubdiv.visible = false
+
                 checkboxLight.visible = false
                 labelFirstEngine.visible = false
                 dropdownlistFirstEngine.visible = false
@@ -2159,21 +2951,36 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
                 dropdownlistSecondEngine.visible = false
                 labelLightRate.visible = false
                 dropdownlistLightRate.visible = false
-                editLightFrames.visible = false
-                spLightFrame.visible = false
 
-                local cr = renderers.current
-                spPassLimit.value = cr.progressive_passLimit
-                spNoiseLimit.value = cr.adaptivity_targetError
-                local seconds = (cr.progressive_timeLimit/1000)
-                spTimeHourLimit.value = seconds/3600
-                spTimeMinuteLimit.value = (seconds - spTimeHourLimit.value*3600)/60
-                spTimeSecondLimit.value = seconds - spTimeHourLimit.value*3600 - spTimeMinuteLimit.value * 60
+                try (checkboxAO.checked = getUserSettingValue userSetting "aochannel_enable" false) catch ()
+                try (checkboxColor.checked = getUserSettingValue userSetting "colorchannel_enable" false) catch ()
+                try (checkboxMtl.checked = getUserSettingValue userSetting "mtlchannel_enable" false) catch ()
+
+                if rendererName == "corona" then (
+                    spPassLimit.visible = true
+                    spTimeHourLimit.visible = true
+                    labelHour.visible = true
+                    spNoiseLimit.visible = true
+
+                    ------------------------------------
+                    local cr = renderers.current
+                    spPassLimit.value = cr.progressive_passLimit
+                    spNoiseLimit.value = cr.adaptivity_targetError
+                    local seconds = (cr.progressive_timeLimit/1000)
+                    spTimeHourLimit.value = seconds/3600
+                    spTimeMinuteLimit.value = (seconds - spTimeHourLimit.value*3600)/60
+                    spTimeSecondLimit.value = seconds - spTimeHourLimit.value*3600 - spTimeMinuteLimit.value * 60
+
+                )
+
+                ------------------------------------------------------
+
+
             )
         ) catch (
             destroydialog renderfarmSetting
             local exception = getCurrentException()
-            messagebox ("插件初始化异常，请联系客服解决。 异常信息：\r\n" + exception) title:myAppName
+            messagebox ("插件初始化异常，请联系客服解决。 异常信息：\r\n" + exception + "\r \n ") title:myAppName
         )
     )
 
@@ -2269,41 +3076,41 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         )
     )
 
-    on btnAddDir pressed do (
-        local dir = getSavePath caption:"选择文件夹"
-        if dir != undefined do (
-            dir = toLower(dir)
-            local isDriveC = StringStartWith dir "c:"
-            if isDriveC then (
-                messagebox "附加文件夹不能放在C盘，请选择其它文件夹。        " title:myAppName
-                return false
-            )
+    -- on btnAddDir pressed do (
+    --     local dir = getSavePath caption:"选择文件夹"
+    --     if dir != undefined do (
+    --         dir = toLower(dir)
+    --         local isDriveC = StringStartWith dir "c:"
+    --         if isDriveC then (
+    --             messagebox "附加文件夹不能放在C盘，请选择其它文件夹。        " title:myAppName
+    --             return false
+    --         )
 
-            if not (StringEndsWith dir "\\") then (
-                dir = dir + "\\"
-            )
+    --         if not (StringEndsWith dir "\\") then (
+    --             dir = dir + "\\"
+    --         )
 
-            local items = dropdownlistAddonDir.items
-            if items == undefined then (
-               items = #()
-            )
+    --         local items = dropdownlistAddonDir.items
+    --         if items == undefined then (
+    --            items = #()
+    --         )
 
-            if (findItem items dir) == 0 then (
-                append items dir
-                dropdownlistAddonDir.items = items
-                dropdownlistAddonDir.selection  = items.count
-            )
-        )
-    )
+    --         if (findItem items dir) == 0 then (
+    --             append items dir
+    --             dropdownlistAddonDir.items = items
+    --             dropdownlistAddonDir.selection  = items.count
+    --         )
+    --     )
+    -- )
 
-    on btnDeleteDir pressed do (
-        local items = dropdownlistAddonDir.items
-        local selectedIndex = dropdownlistAddonDir.selection
-        if items != undefined and selectedIndex != 0 then (
-            deleteItem items selectedIndex
-            dropdownlistAddonDir.items = items
-        )
-    )
+    -- on btnDeleteDir pressed do (
+    --     local items = dropdownlistAddonDir.items
+    --     local selectedIndex = dropdownlistAddonDir.selection
+    --     if items != undefined and selectedIndex != 0 then (
+    --         deleteItem items selectedIndex
+    --         dropdownlistAddonDir.items = items
+    --     )
+    -- )
 
     on checkboxLight changed theState do (
         labelFirstEngine.enabled = theState
@@ -2331,7 +3138,11 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     )
 
     on spNoiseLimit changed arg do (
-        renderers.current.adaptivity_targetError = spNoiseLimit.value
+        try (
+            renderers.current.adaptivity_targetError = spNoiseLimit.value
+        ) catch(
+            renderers.current.Target_image_noise_level__error = spNoiseLimit.value
+        )
     )
 
     on spTimeHourLimit changed arg do (
@@ -2352,6 +3163,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         renderers.current.progressive_timeLimit = seconds
     )
 
+
+
     on checkboxGamma changed theState do (
         spGamma.enabled = theState
         if theState then (
@@ -2362,6 +3175,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     )
 
     on btnSubmit pressed do (
+        local errmsg = ""
+        local warnmsg = ""
         if not checkInvalidObjectName() then (
             return false
         )
@@ -2389,6 +3204,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             return false
         )
 
+        -- -- 关闭预览帧
         local previewFrame = editPreviewFrames.text
         previewFrame = trimspace previewFrame
         if(previewFrame.count > 0) then (
@@ -2462,13 +3278,24 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         ) else (
             args.Add "renderername" "vray"
         )
+        -- 关闭预览帧
 
         if checkboxPreviewStop.checked and editPreviewFrames.text.count == 0 then (
             checkboxPreviewStop.checked = false
         )
 
+        -- 颜色通道增加
+        if (checkboxColor.checked) then (
+            checkResult = checkMixupMtl rendererName
+            warnmsg += checkResult[1]
+            if (checkResult[2] != "") then (
+                errorLog += checkResult[2] + ","
+            )
+        )
+
         args.Add "lightrate" lightRate
-        args.Add "previewframes" editPreviewFrames.text
+        -- 关闭预览帧
+		args.Add "previewframes" editPreviewFrames.text
         args.Add "stopafterpreviewframes" checkboxPreviewStop.checked
         args.Add "gamma_correction" checkboxGamma.checked
         args.Add "gamma_fileout_value" spGamma.value
@@ -2477,11 +3304,21 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         args.Add "lightjob_frames" editLightFrames.text
         args.Add "lightjob_firstengine" firstEngineList[dropdownlistFirstEngine.selection]
         args.Add "lightjob_secondengine" secondEngineList[dropdownlistSecondEngine.selection]
+        --- add for color mtl ao elements
+        args.Add "aochannel_enable" checkboxAO.checked
+        args.Add "aochannel_radiu" spRadiu.value
+        args.Add "aochannel_subdiv" spSubdiv.value
+        args.Add "colorchannel_enable" checkboxColor.checked
+        args.Add "mtlchannel_enable" checkboxMtl.checked
 
         if renderName == "corona" then(
             args.Add "pass_limit" spPassLimit.value
             args.Add "time_limit" ((spTimeHourLimit.value as string) + ":" + (spTimeMinuteLimit.value as string) + ":" + (spTimeSecondLimit.value as string))
             args.Add "noise_level_limit" spNoiseLimit.value
+        )else if rendererName == "fstorm" then(
+            args.Add "pass_limit"  ""
+            args.Add "time_limit"  spTimeLimit.value
+            args.Add "noise_level_limit" spNoiseThreshold.value
         )else(
             args.Add "pass_limit"  ""
             args.Add "time_limit" ""
@@ -2493,9 +3330,9 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             autosave.Enable = false
         )
 
-        local currentfileOutGamma = resetOutGamma
 
         local modifyResult = modifySceneFile args
+
         if not checkboxGamma.checked then (
             resetOutGamma = fileOutGamma
         )
@@ -2535,12 +3372,14 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         )
 
         local strtime = getTimeString()
-        local extralFiles = dropdownlistAddonDir.items
+		-- 关闭补充资产
+        -- local extralFiles = dropdownlistAddonDir.items
         if isVrayRenderer then (
             local vfbExtralFiles = getVFBExtraFiles()
-            extralFiles = extralFiles + vfbExtralFiles
+            -- extralFiles = extralFiles + vfbExtralFiles
         )
-        local tempFilesListPath = createZipFilesList tempdir strtime extralFiles renderName
+        local tempFilesListPath = createZipFilesList tempdir strtime  renderName
+        -- local tempFilesListPath = createZipFilesList tempdir strtime extralFiles renderName
         print (tempFilesListPath )
         if tempFilesListPath.count == 0 then (
             if isAutoBackupEnabled then (
@@ -2559,7 +3398,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         local camerasToRender = cameraSelected.items
 
 
-        taskIniFilePath = createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode resetOutGamma args
+        taskIniFilePath = createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode fileoutgamma args
 
         print (taskIniFilePath)
 
