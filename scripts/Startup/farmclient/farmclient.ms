@@ -2638,6 +2638,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     local tooltipGamma = "设置渲染输出图片的伽马(Gamma)，不设置则使用系统默认值"
     local tooltipLight = "先渲染光子，再渲染成图，用来节省渲染时间。"
     local tooltipFrameList = "帧序列示例：\r\n渲染第5和10和15帧例：5 10 15 或5,10,15，空格或者逗号分隔\r\n渲染第1帧到第100帧例：1-100，减号分隔\r\n渲染第1帧到第100帧，隔5帧渲染1帧(1, 6, 11, 16)例：1-100:5 一种格式"
+    local cameraSetingHashTable = dotNetObject "System.Collections.Hashtable"
 
     button btnAD "xxx" width:500 height:100 images:#(local_image, undefined,1,1,1,1,1)
 
@@ -2667,7 +2668,9 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     group "相机"
     (
         listbox cameraAll "场景相机列表(双击添加)" pos:[20,300] width:200
-        label labelmove "-->>" pos:[240,380]
+        button buttonCameraAddAll    ">>>" pos:[230,350] toolTip:"添加所有摄像机"
+        button buttonCameraMoveRight "->>" pos:[230,380] toolTip:"添加选中摄像机"
+        button buttonCameraMoveLeft  "<<-" pos:[230,410] toolTip:"去掉选中摄像机"
         listbox cameraSelected "渲染相机列表(双击删除)" pos:[280,300] width:200
     )
 
@@ -2752,6 +2755,117 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             fixRenderElementsFileExt()
             rendSaveFile = true
             extChanged = true
+        )
+    )
+
+    function loadCameraResolutionModSetting camera_name = (
+        local camera_obj = getnodebyname camera_name
+        if camera_obj == undefined do(
+            messagebox "未找到所选摄像机物体，可能被删除，请重新打开提交面板！"
+            return undefined
+        )
+        local resolution_ratio = #()
+        if CameraResolutionMod != undefined do(
+            if iskindof camera_obj.modifiers[1] CameraResolutionMod do(
+                resolution_ratio = #(camera_obj.modifiers[1].width,camera_obj.modifiers[1].height)
+                if resolution_ratio[1] == renderWidth and resolution_ratio[2] == renderHeight then (
+                    return undefined
+                )
+            )
+
+            if(resolution_ratio[1] == undefined or resolution_ratio[2] == undefined)then(
+                return undefined
+            )
+            local setting = cameraSetingHashTable.Item[camera_name]
+            if setting != undefined then (
+                cameraSetingHashTable.Remove camera_name
+            )
+
+            cameraSetingHashTable.Add camera_name resolution_ratio
+        )
+    )
+
+    function checkCamerasName camerasName = (
+        local rex = #(",","\"","\\","'","?","/",":","<",">","|",":","【","】")
+
+        for i = 1 to rex.count do(
+            if (findstring camerasName rex[i]) != undefined then (
+                return true
+            )
+        )
+        false
+    )
+
+    function getCameraDisplayName camera = (
+        local setting = cameraSetingHashTable.Item[camera]
+        if setting == undefined then (
+            return camera
+        )
+
+        if setting[1] == renderwidth and setting[2] == renderheight then(
+            return camera
+        )
+
+        camera + "(" + (setting[1] as string) + "*" + (setting[2] as string) + ")"
+    )
+    function getCameraNameFromDisplayName str =
+    (
+        local index = reverseFind str "("
+        if index == 0 then (
+            return str
+        )
+        substring str 1 (index-1)
+    )
+
+
+    on buttonCameraAddAll pressed do (
+        local items = #()
+        for item in cameraAll.items do (
+            if checkCamerasName item then (
+                messagebox "相机名中不能包含逗号或引号等非法字符，请修改后再选择此相机。        " title:myAppName
+                return false
+            )
+
+            loadCameraResolutionModSetting item
+
+            append items (getCameraDisplayName(item))
+        )
+        cameraSelected.items = (sort (cameraSelected.items + items))
+        cameraAll.items = #()
+    )
+
+    on buttonCameraMoveRight pressed do (
+        local selectedCamera = cameraAll.selected
+        if selectedCamera != undefined then (
+            if checkCamerasName selectedCamera then (
+                messagebox "相机名中不能包含逗号或引号等非法字符，请修改后再选择此相机。        " title:myAppName
+            ) else (
+                local temp = cameraAll.items
+                local temp2 = cameraSelected.items
+                local index = findItem temp selectedCamera
+                if index > 0 then (
+                    deleteItem temp index
+                    cameraAll.items = temp
+                    loadCameraResolutionModSetting selectedCamera
+                    append temp2 (getCameraDisplayName(selectedCamera))
+                    cameraSelected.items = (sort temp2)
+                )
+            )
+        )
+    )
+
+    on buttonCameraMoveLeft pressed do (
+        local selectedCamera = cameraSelected.selected
+        if selectedCamera != undefined then (
+            local temp = cameraSelected.items
+            local temp2 = cameraAll.items
+            local index = findItem temp selectedCamera
+            if index > 0 then (
+                deleteItem temp index
+                cameraSelected.items = temp
+                append temp2 (getCameraNameFromDisplayName(selectedCamera))
+                cameraAll.items = (sort temp2)
+            )
         )
     )
 
