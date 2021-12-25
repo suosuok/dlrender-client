@@ -3416,7 +3416,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             messagebox "客户端不存在，请重新安装。        " title:myAppName
             return false
         )
-        arg = " -f " + taskIniFilePath  + " -zip " +  temp_zipfile + "\""
+        arg = " -f " + taskIniFilePath  + " -zip " +  temp_zipfile
         print (arg)
         local returnString  = runcmd apppath arg_array:#(arg)
         print ("returnString = " + returnString)
