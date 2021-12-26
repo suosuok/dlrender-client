@@ -17,6 +17,7 @@ pip install pywin32
 """
 
 import json
+import sys
 import time
 import argparse
 import configparser
@@ -33,13 +34,16 @@ status = {"cmd":COMMAND_CLIENT_EXTRA_CHECK_STATUS, "arg":"-s"}
 submit = {"cmd":COMMAND_CLIENT_EXTRA_SUBMIT_JOB, "arg":"-f"}
 
 
-def start_exe(exe_path):
+def start_exe():
     """
     独立启动exe
     此方式可能在IDE里面失效，通过cmd运行和编译可正常运行
     """
+    exe_path = "3dDownload.exe"
+    startup_exe = os.path.join( os.path.abspath(os.path.dirname(os.path.realpath(sys.executable))), exe_path)
+    # print ("startup_exe = {}".format(startup_exe))
     win32api.ShellExecute(
-        0, 'open', exe_path, '', exe_path, 1
+        0, 'open', startup_exe, '', os.path.dirname(startup_exe), 1
     )
 
 class WSClient:
@@ -102,16 +106,22 @@ def run():
     parser.add_argument("-f", dest="file_path", help="the configure file path ")
     parser.add_argument("-zip", dest="create_zip", help="Crate the zip file for job ")
     results = parser.parse_args()
+
+    if results.status is not None :
+        try:
+            web_client.send(status)
+        except:
+            start_exe()
+
     # 初始化
     try:
         web_client = WSClient()
-        # start_exe()
+
     except:
         print ( "204")
         exit(204)
 
-    if results.status is not None :
-        web_client.send(status)
+
 
     if results.file_path is not None :
         json_data = AnalyseIni(results.file_path).ini_to_json()
