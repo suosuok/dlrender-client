@@ -3577,6 +3577,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
         print(temp_zipfile)
         local apppath = getRenderFarmAppPath()
         print(apppath)
+
         if not doesFileExist apppath then (
             if isAutoBackupEnabled then (
                 autosave.Enable = true
