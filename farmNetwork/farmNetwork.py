@@ -42,6 +42,7 @@ def start_exe():
     exe_path = "3dDownload.exe"
     startup_exe = os.path.join( os.path.abspath(os.path.dirname(os.path.realpath(sys.executable))), exe_path)
     # print ("startup_exe = {}".format(startup_exe))
+
     win32api.ShellExecute(
         0, 'open', startup_exe, '', os.path.dirname(startup_exe), 1
     )
