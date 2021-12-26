@@ -2604,7 +2604,7 @@ function getUserSettingValue setting key defaultValue =
     value
 )
 
-rollout renderfarmSetting "渲染设置" width:500 height:660
+rollout renderfarmSetting "渲染设置" width:500 height:670
 (
     local rendererName = getCurrentRendererName()
     -- AO 半径默认设置为100
@@ -2720,9 +2720,25 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,590]
         spinner spGamma "" align:#left pos:[160,590] range:[0.1,5.0, 1.0] type:#float height:20 width:50
     )
+    label progressText "提交进度"  pos:[10,625] visible:false
+    progressBar progress_step color:[0, 100, 181] pos:[65,627] width:430 height:12 visible:false
 
-    button btnSubmit "保存并提交渲染"  pos:[200,627]
+    button btnSubmit "保存并提交渲染"  pos:[200,642]
     timer checkSubmitClock "checkSubmitClock" active:false interval:1000 --tick once a second
+
+
+    function visibleProgress visible = (
+        progress_step.value = 0
+        progress_step.color = [0, 100, 181]
+        if (visible) then (
+            progress_step.visible = true
+            progressText.visible = true
+        )else (
+            progress_step.visible = false
+            progressText.visible = false
+        )
+    )
+
 
     on dropdownlistFileExt selected index do (
         local newFileExt = "." + extList[index]
@@ -2796,6 +2812,13 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         false
     )
 
+    function checkCamerasNode camerasName = (
+        local camerasLsit = getAllCameras()
+        if (findItem camerasLsit camerasName) > 0 then(
+            return true
+        )
+        false
+    )
     function getCameraDisplayName camera = (
         local setting = cameraSetingHashTable.Item[camera]
         if setting == undefined then (
@@ -2808,6 +2831,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
 
         camera + "(" + (setting[1] as string) + "*" + (setting[2] as string) + ")"
     )
+
     function getCameraNameFromDisplayName str =
     (
         local index = reverseFind str "("
@@ -2817,6 +2841,24 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         substring str 1 (index-1)
     )
 
+    function getSelectedCameras =
+    (
+        local selectedCameras = #()
+        if cameraSelected.items == undefined then (
+            return selectedCameras
+        )
+
+        for item in cameraSelected.items do (
+            local name = getCameraNameFromDisplayName(item)
+            append selectedCameras name
+        )
+        selectedCameras
+    )
+
+    function trimspace str =
+    (
+        trimLeft (trimRight str)
+    )
 
     on buttonCameraAddAll pressed do (
         local items = #()
@@ -3291,7 +3333,10 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
     on btnSubmit pressed do (
         local errmsg = ""
         local warnmsg = ""
+        visibleProgress(true)
+        progress_step.value = 5
         if not checkInvalidObjectName() then (
+            visibleProgress(false)
             return false
         )
 
@@ -3302,6 +3347,18 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         if not checkDuplicateCameraNode(cameraSelected.items) then (
             return false
         )
+        progress_step.value = 7
+        local selectedCameras = getSelectedCameras()
+
+        if selectedCameras.count > 0 then(
+            for item in selectedCameras do (
+                if not (checkCamerasNode item)then(
+                    errmsg += "没有找到相机 " +  item + " 请修改后重新提交\r\n"
+                )
+            )
+        )
+
+        progress_step.value = 10
 
         local taskFrame = editFrames.text
         taskFrame = trimspace taskFrame
@@ -3343,7 +3400,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
                return false
             )
         )
-
+        progress_step.value = 21
         local lightjobEnabled = checkboxLight.checked
         local lightjobFirstIndex = 0
         local lightjobSecondIndex = 0
@@ -3363,7 +3420,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         if not continueSubmit then (
             return false
         )
-
+        progress_step.value = 30
         btnSubmit.text = "正在处理文件，请稍后"
         btnSubmit.enabled = false
         checkSubmitClock.active = false
@@ -3393,7 +3450,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             args.Add "renderername" "vray"
         )
         -- 关闭预览帧
-
+        progress_step.value = 35
         if checkboxPreviewStop.checked and editPreviewFrames.text.count == 0 then (
             checkboxPreviewStop.checked = false
         )
@@ -3406,7 +3463,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
                 errorLog += checkResult[2] + ","
             )
         )
-
+        progress_step.value = 40
         args.Add "lightrate" lightRate
         -- 关闭预览帧
 		args.Add "previewframes" editPreviewFrames.text
@@ -3462,7 +3519,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             btnSubmit.enabled = true
             return false
         )
-
+        progress_step.value = 45
         local tempdir = ""
         if isSystemDriveSpaceOK() then (
             tempDir = sysInfo.tempdir
@@ -3511,7 +3568,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         local outputFilename = "farm-." + dropdownlistFileExt.selected
         local camerasToRender = cameraSelected.items
 
-
+        progress_step.value = 50
         taskIniFilePath = createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode fileoutgamma args
 
         print (taskIniFilePath)
@@ -3533,6 +3590,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
         arg = " -f " + taskIniFilePath  + " -zip " +  temp_zipfile
         print (arg)
         local returnString  = runcmd apppath arg_array:#(arg)
+        progress_step.value = 80
         print ("returnString = " + returnString)
         if  returnString == "200" then (
 
@@ -3550,6 +3608,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
 
     on checkSubmitClock tick do (
         print ("time end ")
+        progress_step.value = 95
         if not doesFileExist taskIniFilePath then (
             if isAutoBackupEnabled then (
                 autosave.Enable = true
@@ -3558,6 +3617,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:660
             btnSubmit.enabled = true
             checkSubmitClock.active = false
             messagebox "提交渲染任务完成，请继续您的工作。        " title:myAppName
+            progress_step.value = 100
         )
     )
 )
