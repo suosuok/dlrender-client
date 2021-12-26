@@ -110,9 +110,10 @@ def run():
 
     if results.status is not None :
         try:
-            web_client.send(status)
-        except:
             start_exe()
+        except:
+            pass
+
 
     # 初始化
     try:
