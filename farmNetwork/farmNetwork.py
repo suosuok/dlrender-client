@@ -50,7 +50,7 @@ def start_exe():
 class WSClient:
     address = "ws://127.0.0.1"
     prot = 5665
-    ws_address = address + ":{}/ws".format(prot)
+    ws_address = address + ":{}".format(prot)
 
     def __init__(self):
         self.ws = create_connection(self.ws_address)
@@ -59,8 +59,11 @@ class WSClient:
         self.ws.send(json.dumps(params))
         #print("Sending Data: {}".format(params))
         result = self.ws.recv()
-        "打印返回码，maxscripts接收返回码，判断状态"
-        print(result)
+        if len(result) > 5 :
+            json_dict = eval(result)
+            print (json_dict["b"])
+        else:
+            print (result)
 
     def quit(self):
         self.ws.close()
@@ -110,38 +113,46 @@ def run():
 
     if results.status is not None :
         try:
-            start_exe()
+            web_client = WSClient()
+            web_client.send(status)
         except:
-            pass
+            print("204")
+            try:
+                start_exe()
+            except:
+                pass
 
 
-    # 初始化
-    try:
-        web_client = WSClient()
 
-    except:
-        print ( "204")
-        exit(204)
 
 
 
     if results.file_path is not None :
-        json_data = AnalyseIni(results.file_path).ini_to_json()
-        zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
-        zip_path = results.create_zip
+        try:
+            web_client = WSClient()
 
-        create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
-        if create_zipfile_result == "Successful":
-            # pass
-            os.remove(results.file_path)
-        else:
-            return "205"
+            json_data = AnalyseIni(results.file_path).ini_to_json()
+            zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
+            zip_path = results.create_zip
 
-        json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
-        submit["arg"] = json_data
-        web_client.send(submit)
+            create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
+            if create_zipfile_result == "Successful":
+                # pass
+                os.remove(results.file_path)
+            else:
+                return "205"
 
-    web_client.quit()
+            json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
+            submit["arg"] = json_data
+            web_client.send(submit)
+        except:
+            print("204")
+
+    try:
+        web_client.quit()
+    except:
+        pass
+
 if __name__ == '__main__':
     run()
 
