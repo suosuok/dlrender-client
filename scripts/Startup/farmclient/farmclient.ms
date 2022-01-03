@@ -1242,13 +1242,21 @@ function modifySceneFile args =
     )
 
     try (rendUseActiveView = true) catch()
-
     try (
         if rendOutputFilename.count == 0 then (
             rendSaveFile = true
             rendOutputFilename = "c:\\farm-.TGA"
         )
     )catch()
+
+    local deleteOtherChannel = args.Item["delete_other_channel"]
+    if deleteOtherChannel then (
+        try (
+            local rem = MaxOps.GetCurRenderElementMgr()
+            rem.RemoveAllRenderElements()
+        ) catch()
+    )
+
 
     local gammaCorrection = args.Item["gamma_correction"]
     if gammaCorrection then (
@@ -1583,7 +1591,7 @@ function isSceneUseCorona =
     false
 )
 
-function createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout cameraList taskFrame lightRate freemode fileOutGamma args =
+function createIniFile scenepath tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout cameraList taskFrame lightRate freemode fileOutGamma args =
 (
 
     local tempIniFilePath = tempDir + "renderfarm-task-" + strtime + ".ini"
@@ -1625,7 +1633,7 @@ function createIniFile tempdir strtime tempFilesListPath outputFilename machineL
         24: "2022"
         defult: "2012"
     )
-
+    setINISetting tempIniFilePath "Arguments" "orgscene" scenepath
     setINISetting tempIniFilePath "Arguments" "zipfileslistpath" tempFilesListPath
     setINISetting tempIniFilePath "Arguments" "name" taskName
     setINISetting tempIniFilePath "Arguments" "softname" "3dsmax"
@@ -1674,7 +1682,7 @@ function createIniFile tempdir strtime tempFilesListPath outputFilename machineL
     )
     setINISetting tempIniFilePath "Properties" "colorchannel_enable" (args.Item["colorchannel_enable"] as string)
     setINISetting tempIniFilePath "Properties" "mtlchannel_enable" (args.Item["mtlchannel_enable"] as string)
-    -- setINISetting tempIniFilePath "Properties" "delete_other_channel" (args.Item["delete_other_channel"] as string)
+    setINISetting tempIniFilePath "Properties" "delete_other_channel" (args.Item["delete_other_channel"] as string)
 
 
     setINISetting tempIniFilePath "Properties" "vrayoriginalstring" (renderers.current as string)
@@ -1859,11 +1867,8 @@ function getRenderFarmAppPath =
     apppath = ""
     print myAppRegistryname
     apppath = RegTools @"SOFTWARE\FarmClient" @"Installdir"
-
     print apppath
-    print "------------"
     print myAppFileName
-    print "------------2"
     apppath = apppath + "\\" + "farmNetwork.exe"
     return apppath
 )
@@ -2206,6 +2211,24 @@ function getAORadiuCaption rendererName =
         return "最大距离："
     )
 )
+function reverseFind str c =
+(
+	if str == undefined or c == undefined then (
+		return 0
+	)
+
+	local count = str.count
+	i = count
+	while i > 0 do
+	(
+		if str[i] == c then (
+			return i
+		)
+		i = i-1
+	)
+
+	return 0
+)
 function getCurrentRendererName =
 (
     local currentRenderer = renderers.current as string
@@ -2223,6 +2246,7 @@ function getCurrentRendererName =
     )
     currentRenderer
 )
+
 function checkMixupMtl renderName =
 (
     local crMtl =  #("CoronaMtl","CoronaLightMtl","CoronaLayeredMtl","CoronaRaySwitchMtl","CoronaHairMtl","CoronaPortalMtl","CoronaSelectMtl","CoronaShadowCatcherMtl","CoronaSkinMtl","CoronaVolumeMtl")
@@ -2261,6 +2285,78 @@ function checkMixupMtl renderName =
     return #(msg,code)
 )
 
+function getVRayExtraTex = (
+    try ( return (VRayExtraTex elementname:"aotexture") ) catch ()
+    try ( return (VRay_ExtraTex elementname:"aotexture") ) catch ()
+    try ( return (VRay附加纹理 elementname:"aotexture")) catch ()
+    try ( return (VRay_附加纹理 elementname:"aotexture")) catch ()
+    try ( return (VRay额外纹理 elementname:"aotexture")) catch ()
+    try ( return (附加纹理 elementname:"aotexture") ) catch ()
+    try ( return (额外纹理 elementname:"aotexture")) catch ()
+    try ( return (VR_附加贴图 elementname:"aotexture")) catch ()
+    try ( return (VR_附加纹理 elementname:"aotexture")) catch ()
+
+    undefined
+    )
+
+function getVRayDirt = (
+    try ( return (VRayDirt name:"aodirt")) catch ()
+    try ( return (VRay污垢 name:"aodirt")) catch ()
+    try ( return (VRay_污垢 name:"aodirt")) catch ()
+    try ( return (VR污垢 name:"aodirt")) catch ()
+    try ( return (VR_污垢 name:"aodirt")) catch ()
+    try ( return (VR圬垢 name:"aodirt")) catch ()
+    try ( return (VR_圬垢 name:"aodirt")) catch ()
+    try ( return (污垢 name:"aodirt")) catch ()
+    undefined
+    )
+
+function setVRayExtraTex obj texture = (
+    try (
+        obj.texture = texture
+        return true
+    ) catch ()
+    try (
+        obj.纹理 = texture
+        return true
+    ) catch ()
+    try (
+        obj._纹理 = texture
+        return true
+    ) catch ()
+    )
+
+function setVRayDirtInfo obj radius subdiv = (
+    try (
+        obj.radius = radius
+        obj.subdivs = subdiv
+        return true
+    ) catch ()
+    try (
+        obj.半径 = radius
+        obj.细分 = subdiv
+        return true
+    ) catch ()
+    try (
+        obj._半径 = radius
+        obj._细分 = subdiv
+        return true
+    ) catch ()
+    )
+
+function isVRayExtraTexExist className = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        curClassName =  (classof(element) as string)
+        if curClassName == className do (
+            return true
+        )
+    )
+    return false
+    )
 function canUseAOChannel = (
     local aochannel = getVRayExtraTex()
     local dirt = getVRayDirt()
@@ -2278,7 +2374,7 @@ function addAOChannel args = (
     )
 
     local aoRadiu = args.Item["aochannel_radiu"]
-    -- local aoSubdiv = args.Item["aochannel_subdiv"]
+    local aoSubdiv = args.Item["aochannel_subdiv"]
 
     try (
         rem.SetElementsActive(true)
@@ -2604,7 +2700,17 @@ function getUserSettingValue setting key defaultValue =
     value
 )
 
-rollout renderfarmSetting "渲染设置" width:500 height:670
+function checkClient = (
+    arg = " -s " + "check_status"
+    local apppath = getRenderFarmAppPath()
+    print (arg)
+    print (apppath)
+    local returnString  = runcmd apppath arg_array:#(arg)
+    print ("returnString = " + returnString)
+
+)
+
+rollout renderfarmSetting "渲染设置" width:500 height:700
 (
     local rendererName = getCurrentRendererName()
     -- AO 半径默认设置为100
@@ -2686,44 +2792,46 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
         -- button btnAddDir "添加"  pos:[370,513]
         -- button btnDeleteDir "删除"  pos:[430,513]
 
-        checkbox checkboxLight "先渲染光子" toolTip:tooltipLight checked:false fieldwidth:40 align:#left pos:[20,539]
-        label labelFirstEngine "首次引擎"  pos:[110,540]
-        dropdownlist dropdownlistFirstEngine items:firstEngineNameList pos:[160,538] width:70 height:18
-        label labelSecondEngine "二次引擎"  pos:[250,540]
-        dropdownlist dropdownlistSecondEngine items:secondEngineNameList pos:[300,538] width:80 height:18
-        label labelLightRate "光子比例"  pos:[385,540]
-        dropdownlist dropdownlistLightRate items:lightRateList pos:[435,538] width:55 height:18
-        edittext editLightFrames "光子帧序列:" fieldWidth:150 pos:[20,565] labelOnTop:false height:16
-        spinner spLightFrame  "每N帧渲染一次光子：" fieldwidth:30 align:#left pos:[330,565] range:[1,1000,1] type:#integer
+        checkbox checkboxLight "先渲染光子" toolTip:tooltipLight checked:false fieldwidth:40 align:#left pos:[20,520]
+        label labelFirstEngine "首次引擎"  pos:[110,520]
+        dropdownlist dropdownlistFirstEngine items:firstEngineNameList pos:[160,518] width:70 height:18
+        label labelSecondEngine "二次引擎"  pos:[250,520]
+        dropdownlist dropdownlistSecondEngine items:secondEngineNameList pos:[300,518] width:80 height:18
+        label labelLightRate "光子比例"  pos:[385,520]
+        dropdownlist dropdownlistLightRate items:lightRateList pos:[435,518] width:55 height:18
+        edittext editLightFrames "光子帧序列:" fieldWidth:150 pos:[20,545] labelOnTop:false height:16
+        spinner spLightFrame  "每N帧渲染一次光子：" fieldwidth:30 align:#left pos:[330,545] range:[1,1000,1] type:#integer
+
+
+        spinner spPassLimit "        过程限制：" align:#left pos:[20,520] range:[0,1048576,0] type:#integer height:20 width:80
+        spinner spTimeHourLimit "时限：" align:#left pos:[250,520] range:[0,239,0] type:#integer height:20 width:45
+
+        label labelHour "时" pos:[330,520]
+        spinner spTimeMinuteLimit "" align:#left pos:[350,520] range:[0,59,0] type:#integer height:20 width:40
+        label labelMinute "分" pos:[400,520]
+        spinner spTimeSecondLimit "" align:#left pos:[420,520] range:[0,59,0] type:#integer height:20 width:40
+        label labelSecond "秒" pos:[470,520]
+        spinner spNoiseLimit "噪点等级限制：" align:#left pos:[20,545] range:[0,1000.0,0] type:#float height:20 width:80
+
+        checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,570]
+        spinner spGamma "" align:#left pos:[160,570] range:[0.1,5.0, 1.0] type:#float height:20 width:50
+
 
         -- 增加通道
-        checkbox checkboxColor "颜色通道图" align:#left  pos:[20,520]
-        checkbox checkboxMtl "材质通道图" align:#left  pos:[110,520]
-        checkbox checkboxAO "AO图"  pos:[200,520]
+        checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,590]
+        checkbox checkboxColor "颜色通道" align:#left  pos:[120,590]
+        checkbox checkboxMtl "材质通道" align:#left  pos:[190,590]
+        checkbox checkboxAO "AO"  pos:[260,590]
 
-        spinner spRadiu  aoRadiuCaption  align:#left pos:[260,520] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
-        spinner spSubdiv "细分：" align:#left pos:[400,520] range:[1,1000,16] type:#integer height:20 width:50
+        spinner spRadiu  aoRadiuCaption  align:#left pos:[320,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
+        spinner spSubdiv "细分" align:#left pos:[430,590] range:[1,1000,16] type:#integer height:20 width:50
 
         -- 增加通道结束
-
-
-        spinner spPassLimit "        过程限制：" align:#left pos:[20,543] range:[0,1048576,0] type:#integer height:20 width:80
-        spinner spTimeHourLimit "时限：" align:#left pos:[250,543] range:[0,239,0] type:#integer height:20 width:45
-
-        label labelHour "时" pos:[330,543]
-        spinner spTimeMinuteLimit "" align:#left pos:[350,543] range:[0,59,0] type:#integer height:20 width:40
-        label labelMinute "分" pos:[400,543]
-        spinner spTimeSecondLimit "" align:#left pos:[420,543] range:[0,59,0] type:#integer height:20 width:40
-        label labelSecond "秒" pos:[470,543]
-        spinner spNoiseLimit "噪点等级限制：" align:#left pos:[20,565] range:[0,1000.0,0] type:#float height:20 width:80
-
-        checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,590]
-        spinner spGamma "" align:#left pos:[160,590] range:[0.1,5.0, 1.0] type:#float height:20 width:50
     )
-    label progressText "提交进度"  pos:[10,625] visible:false
-    progressBar progress_step color:[0, 100, 181] pos:[65,627] width:430 height:12 visible:false
+    label progressText "提交进度"  pos:[10,660] visible:false
+    progressBar progress_step color:[0, 100, 181] pos:[65,662] width:430 height:12 visible:false
 
-    button btnSubmit "保存并提交渲染"  pos:[200,642]
+    button btnSubmit "保存并提交渲染"  pos:[200,675]
     timer checkSubmitClock "checkSubmitClock" active:false interval:1000 --tick once a second
 
 
@@ -2811,7 +2919,19 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
         )
         false
     )
+    function getAllCameras = (
+        local names = #()
+        cams = for cam in cameras where (superclassof cam == camera) collect cam
+        if cams.count == 0 then (
+            return names
+        )
 
+        for cam in cams do (
+            trimCameraNameSpace(cam)
+            append names cam.name
+        )
+        names
+    )
     function checkCamerasNode camerasName = (
         local camerasLsit = getAllCameras()
         if (findItem camerasLsit camerasName) > 0 then(
@@ -3017,6 +3137,12 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
             dropdownlistLightRate.enabled = false
             labelLightRate.enabled = false
             editLightFrames.enabled = false
+
+
+            try(
+                checkboxDeleteOtherChannel.checked = getUserSettingValue userSetting "delete_other_channel" false
+            )catch()
+
 
             if isVrayRenderer then (
                 spPassLimit.visible = false
@@ -3331,6 +3457,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
     )
 
     on btnSubmit pressed do (
+        checkClient()
         local errmsg = ""
         local warnmsg = ""
         visibleProgress(true)
@@ -3476,6 +3603,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
         args.Add "lightjob_firstengine" firstEngineList[dropdownlistFirstEngine.selection]
         args.Add "lightjob_secondengine" secondEngineList[dropdownlistSecondEngine.selection]
         --- add for color mtl ao elements
+
+        args.Add "delete_other_channel" checkboxDeleteOtherChannel.checked
         args.Add "aochannel_enable" checkboxAO.checked
         args.Add "aochannel_radiu" spRadiu.value
         args.Add "aochannel_subdiv" spSubdiv.value
@@ -3567,9 +3696,9 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
 
         local outputFilename = "farm-." + dropdownlistFileExt.selected
         local camerasToRender = cameraSelected.items
-
+        local scenepath = maxFilePath + maxFileName
         progress_step.value = 50
-        taskIniFilePath = createIniFile tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode fileoutgamma args
+        taskIniFilePath = createIniFile scenepath tempdir strtime tempFilesListPath outputFilename machineLimit taskTimeout camerasToRender taskFrame lightRate freemode fileoutgamma args
 
         print (taskIniFilePath)
 
@@ -3601,6 +3730,9 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
         )
         else(
             messagebox "提交失败，客户端无法连接到网络       " title:myAppName
+            arg = " -s check_status"
+            local returnString  = runcmd apppath arg_array:#(arg)
+            print ("returnString = " + returnString)
         )
         -- runapp ("\"" + apppath + "\"")  false args:#("-f\"" + taskIniFilePath + "\"")
 
@@ -3620,6 +3752,19 @@ rollout renderfarmSetting "渲染设置" width:500 height:670
             progress_step.value = 100
         )
     )
+)
+
+fn get_image = (
+    try(
+        print scriptSelfDir
+        local_image = (scriptSelfDir + "\ad.jpg")
+        download interNet_image local_image
+
+    )catch(
+        local_image = (scriptSelfDir + "\ad.jpg")
+
+    )
+
 )
 
 function showSubmitDialog = (
