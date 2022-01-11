@@ -1669,6 +1669,40 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     setINISetting tempIniFilePath "Properties" "numatmospherics" (numAtmospherics as string)
     setINISetting tempIniFilePath "Properties" "rendoutputfilename" rendOutputFilename
 
+    if renderName == "vray" then (
+        setINISetting tempIniFilePath "RendererInfo" "RendererName" "vray"
+        setINISetting tempIniFilePath "RendererInfo" "vray_gi_on"  ( renderers.current.gi_on as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_gi_primary_multiplier"  ( renderers.current.gi_primary_multiplier as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_gi_primary_type"  ( renderers.current.gi_primary_type as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_gi_secondary_type"  ( renderers.current.gi_secondary_type as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_gi_secondary_multiplier"  ( renderers.current.gi_secondary_multiplier as string )
+
+        setINISetting tempIniFilePath "RendererInfo" "vray_adv_irradmap_mode"  ( renderers.current.adv_irradmap_mode as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_adv_irradmap_loadFileName"  ( renderers.current.adv_irradmap_loadFileName as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_adv_irradmap_saveFileName"  ( renderers.current.adv_irradmap_saveFileName as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_adv_irradmap_autoSave"  ( renderers.current.adv_irradmap_autoSave as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_adv_irradmap_autoSaveFileName"  ( renderers.current.adv_irradmap_autoSaveFileName as string )
+
+        setINISetting tempIniFilePath "RendererInfo" "vray_lightcache_mode"  ( renderers.current.lightcache_mode as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_lightcache_loadFileName"  ( renderers.current.lightcache_loadFileName as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_lightcache_saveFileName"  ( renderers.current.lightcache_saveFileName as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_lightcache_autoSave"  ( renderers.current.lightcache_autoSave as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_lightcache_autoSaveFileName"  ( renderers.current.lightcache_autoSaveFileName as string )
+
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_on"  ( renderers.current.output_on as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_saveRawFile"  ( renderers.current.output_saveRawFile as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_rawFileName"  ( renderers.current.output_rawFileName as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_saveFile"  ( renderers.current.output_saveFile as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_separateFolders"  ( renderers.current.output_splitgbuffer as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_splitAlpha"  ( renderers.current.output_splitAlpha as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_splitRGB"  ( renderers.current.output_splitRGB as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_splitfilename"  ( renderers.current.output_splitfilename as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_splitgbuffer"  ( renderers.current.output_splitgbuffer as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_options_dontRenderImage"  ( renderers.current.options_dontRenderImage as string )
+
+    )
+
+
     if renderName == "corona" then (
         setINISetting tempIniFilePath "Properties" "_pass_limit" (args.Item["pass_limit"] as string)
         setINISetting tempIniFilePath "Properties" "_time_limit" (args.Item["time_limit"] as string)
@@ -1717,7 +1751,6 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
 
     setINISetting tempIniFilePath "Properties" "rendername" renderName
     if renderName == "corona" then (
-        setINISetting tempIniFilePath "Plugins" "vray" "4.10.02"
         setINISetting tempIniFilePath "Plugins" "corona" (getCoronaRendererVersion(true))
         setINISetting tempIniFilePath "Properties" "lightjobenabled" "false"
     ) else (
