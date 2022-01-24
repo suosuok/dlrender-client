@@ -25,6 +25,8 @@ import win32api
 from websocket import create_connection
 import os
 import zipfile
+import winreg
+
 
 COMMAND_CLIENT_EXTRA_CHECK_STATUS = 'check_status'
 COMMAND_CLIENT_EXTRA_SUBMIT_JOB = 'submit_job'
@@ -40,9 +42,10 @@ def start_exe():
     此方式可能在IDE里面失效，通过cmd运行和编译可正常运行
     """
     exe_path = "3dDownload.exe"
-    startup_exe = os.path.join( os.path.abspath(os.path.dirname(os.path.realpath(sys.executable))), exe_path)
-    # print ("startup_exe = {}".format(startup_exe))
-
+    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\FarmClient")
+    value, type = winreg.QueryValueEx(key, "Installdir")
+    client_path = value.replace(r"\resources\client","")
+    startup_exe = os.path.join( client_path, exe_path)
     win32api.ShellExecute(
         0, 'open', startup_exe, '', os.path.dirname(startup_exe), 1
     )
@@ -57,7 +60,6 @@ class WSClient:
 
     def send(self, params):
         self.ws.send(json.dumps(params))
-        #print("Sending Data: {}".format(params))
         result = self.ws.recv()
         if len(result) > 5 :
             json_dict = eval(result)
@@ -115,36 +117,31 @@ def run():
         try:
             web_client = WSClient()
             web_client.send(status)
-            web_client.quit()
         except:
-            print("204")
             try:
+                print("204")
                 start_exe()
             except:
                 pass
 
-
-
-
-
-
     if results.file_path is not None :
         try:
             json_data = AnalyseIni(results.file_path).ini_to_json()
-            zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
-            zip_path = results.create_zip
-
-            create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
-            if create_zipfile_result == "Successful":
-                # pass
-                os.remove(results.file_path)
-            else:
-                return "205"
-
-            json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
+            # zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
+            # zip_path = results.create_zip
+            #
+            # create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
+            # if create_zipfile_result == "Successful":
+            #     # pass
+            #     os.remove(results.file_path)
+            # else:
+            #     return "205"
+            #
+            # json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
             submit["arg"] = json_data
             web_client = WSClient()
             web_client.send(submit)
+            os.remove(results.file_path)  ## 用于通知max ，任务已提交
             web_client.quit()
         except:
             print("204")
