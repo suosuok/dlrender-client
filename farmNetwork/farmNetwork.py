@@ -60,7 +60,6 @@ class WSClient:
 
     def send(self, params):
         self.ws.send(json.dumps(params))
-        #print("Sending Data: {}".format(params))
         result = self.ws.recv()
         if len(result) > 5 :
             json_dict = eval(result)
@@ -128,20 +127,21 @@ def run():
     if results.file_path is not None :
         try:
             json_data = AnalyseIni(results.file_path).ini_to_json()
-            zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
-            zip_path = results.create_zip
-
-            create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
-            if create_zipfile_result == "Successful":
-                # pass
-                os.remove(results.file_path)
-            else:
-                return "205"
-
-            json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
+            # zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
+            # zip_path = results.create_zip
+            #
+            # create_zipfile_result = create_zipfile(zip_file_configure_path, zip_path)
+            # if create_zipfile_result == "Successful":
+            #     # pass
+            #     os.remove(results.file_path)
+            # else:
+            #     return "205"
+            #
+            # json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
             submit["arg"] = json_data
             web_client = WSClient()
             web_client.send(submit)
+            os.remove(results.file_path)  ## 用于通知max ，任务已提交
             web_client.quit()
         except:
             print("204")
