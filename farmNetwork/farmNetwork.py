@@ -115,6 +115,7 @@ def run():
         try:
             web_client = WSClient()
             web_client.send(status)
+            web_client.quit()
         except:
             print("204")
             try:
@@ -129,8 +130,6 @@ def run():
 
     if results.file_path is not None :
         try:
-            web_client = WSClient()
-
             json_data = AnalyseIni(results.file_path).ini_to_json()
             zip_file_configure_path = json_data["Arguments"]["zipfileslistpath"]
             zip_path = results.create_zip
@@ -144,14 +143,11 @@ def run():
 
             json_data["Arguments"]["zipfileslistpath"] = zip_path # "/data/home/xubaolong/dlrenderfarm/test.zip"
             submit["arg"] = json_data
+            web_client = WSClient()
             web_client.send(submit)
+            web_client.quit()
         except:
             print("204")
-
-    try:
-        web_client.quit()
-    except:
-        pass
 
 if __name__ == '__main__':
     run()
