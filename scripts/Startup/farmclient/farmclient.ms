@@ -2,6 +2,13 @@
 
 global interNet_image = @"https://mirror-hz.oss-cn-hangzhou.aliyuncs.com/logo/ad.jpg"
 global local_image = ""
+global temp_renderoutput = rendOutputFilename
+struct du (
+
+	fn LogMessage logString = (
+		print (format "%" logString)
+	)
+)
 if scriptSelfDir.count == 0 then (
     local version = getMaxVersion()
     scriptSelfDir = "C:\\Program Files\\Autodesk\\3ds Max " + version + "\\scripts\\Startup\\farmclient"
@@ -1693,7 +1700,7 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
         setINISetting tempIniFilePath "RendererInfo" "vray_output_saveRawFile"  ( renderers.current.output_saveRawFile as string )
         setINISetting tempIniFilePath "RendererInfo" "vray_output_rawFileName"  ( renderers.current.output_rawFileName as string )
         setINISetting tempIniFilePath "RendererInfo" "vray_output_saveFile"  ( renderers.current.output_saveFile as string )
-        setINISetting tempIniFilePath "RendererInfo" "vray_output_separateFolders"  ( renderers.current.output_splitgbuffer as string )
+        setINISetting tempIniFilePath "RendererInfo" "vray_output_separateFolders"  ( renderers.current.output_separateFolders as string )
         setINISetting tempIniFilePath "RendererInfo" "vray_output_splitAlpha"  ( renderers.current.output_splitAlpha as string )
         setINISetting tempIniFilePath "RendererInfo" "vray_output_splitRGB"  ( renderers.current.output_splitRGB as string )
         setINISetting tempIniFilePath "RendererInfo" "vray_output_splitfilename"  ( renderers.current.output_splitfilename as string )
@@ -2736,10 +2743,10 @@ function getUserSettingValue setting key defaultValue =
 function checkClient = (
     arg = " -s " + "check_status"
     local apppath = getRenderFarmAppPath()
-    print (arg)
-    print (apppath)
     local returnString  = runcmd apppath arg_array:#(arg)
-    print ("returnString = " + returnString)
+    if returnString == "204" then (
+        messageBox "客户端未登录，请先登录客户端"
+    )
 
 )
 
@@ -3491,6 +3498,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
     on btnSubmit pressed do (
         checkClient()
+        resetOutputAndElements()
         local errmsg = ""
         local warnmsg = ""
         visibleProgress(true)
@@ -3752,7 +3760,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         arg = " -f " + taskIniFilePath  + " -zip " +  temp_zipfile
         print (arg)
         local returnString  = runcmd apppath arg_array:#(arg)
-        progress_step.value = 80
+        progress_step.value = 80s
         print ("returnString = " + returnString)
         if  returnString == "200" then (
 
@@ -3760,6 +3768,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
             -- messagebox "正在提交渲染任务，请等待完成，不要修改max文件！        " title:myAppName
         )else if(returnString == "205" )then (
             messagebox "压缩失败，请联系客服人员         " title:myAppName
+        )else if (returnString == "204")then (
+            messagebox "客户端不在线，请先登录       " title:myAppName
         )
         else(
             messagebox "提交失败，客户端无法连接到网络       " title:myAppName
@@ -3785,6 +3795,78 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
             progress_step.value = 100
         )
     )
+)
+
+
+
+fn resetOutputAndElements =(
+
+
+	try ( du.LogMessage("rendOutputFilename_FilenameType =" + ( getFilenameType(rendOutputFilename) as string ) ) )catch()
+	if getFilenameType(rendOutputFilename) == ".png" then (
+		rendOutputFilename = ""
+		try ( du.LogMessage("png_libbit =" + (pngio.gettype() as string ) ) )catch()
+
+		png_libbit = pngio.gettype()
+
+		try ( du.LogMessage("png_libbit =" + ( png_libbit as string ) ) )catch()
+
+		if png_libbit != #true24 then ( pngio.setType #true24 )
+
+		pngio.setType png_libbit
+
+		try ( du.LogMessage("png_libbit =" + (pngio.gettype() as string ) ) )catch()
+
+
+	)else(rendOutputFilename = "")
+
+	renderSceneDialog.update()
+	rendOutputFilename = temp_renderoutput
+	rendSaveFile = True
+	du.LogMessage("max file new output = " + ( rendOutputFilename as string ))
+	du.LogMessage ("End of reset render output path ")
+	-- rebuild render output end --
+
+	-- ##  remove elements and add new elements  start ## --
+	ElementArray = #()
+	reManager = maxops.getCurRenderElementMgr()
+	if reManager != undefined do
+	(
+		local AR_Elements = #()
+		local AR_ElementProps = #()
+		local AR_ElementFilenames = #()
+		local AR_Elementnames = #()
+		for i = 1 to reManager.numrenderelements() do
+		(
+			local theelement = reManager.getrenderelement (i - 1)
+			if classof theelement != Missing_Render_Element_Plug_in do
+			(
+				append AR_Elements (classof theelement)
+				local a = #()
+				for prop in (getPropNames theelement) do
+					try(append a (getproperty theelement prop))catch(append a "")
+				append AR_ElementProps a
+				append AR_ElementNames theelement.elementname
+				append AR_ElementFilenames (reManager.GetRenderElementFilename (i - 1))
+			)
+		)
+		reManager.RemoveAllRenderElements()
+		for i = 1 to AR_Elements.count do
+		(
+			reManager.addrenderelement (execute((AR_Elements[i] as string) + "()"))
+			local theelement = reManager.getrenderelement (i - 1)
+
+			for j = 1 to (getPropNames theelement).count do
+				try(setproperty theelement (getPropNames theelement)[j] AR_elementProps[i][j])catch()
+			if AR_ElementFilenames[i] == undefined or AR_ElementFilenames[i] == "" then
+				reManager.SetRenderElementFilename (i-1) ""
+			else
+				reManager.SetRenderElementFilename (i - 1) (getFilenamePath AR_ElementFilenames[i] + getFilenameFile AR_ElementFilenames[i] + getFilenameType RendOutputFilename)
+			theelement.elementname = AR_ElementNames[i]
+		)
+	)
+	renderscenedialog.open()
+	renderscenedialog.close()
 )
 
 fn get_image = (
