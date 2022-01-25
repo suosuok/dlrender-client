@@ -923,19 +923,19 @@ function modifyVraySetting args =
     local colorchannel = args.Item["colorchannel_enable"]
     local mtlchannel = args.Item["mtlchannel_enable"]
 
-    if aochannel then (
-        addAOChannel args
-    )
+    -- if aochannel then (
+    --     addAOChannel args
+    -- )
 
-    if colorchannel then (
-        addColorChannel args
-    )
+    -- if colorchannel then (
+    --     addColorChannel args
+    -- )
 
-    if mtlchannel then (
-        if (addMtlChannel args) then(
-            setMtlChannelId()
-        )
-    )
+    -- if mtlchannel then (
+    --     if (addMtlChannel args) then(
+    --         setMtlChannelId()
+    --     )
+    -- )
 
     try (  -- 单独的渲染通道
         if aochannel or colorchannel then (
@@ -1114,29 +1114,29 @@ function addCoronaMtlChannel args =
 
 fn setCrMtlChannelIdCore m = (
 
-try(
-    if(m.renderElementPropagation == 3)then(
-        m.renderElementPropagation = 0
-    )
-)catch()
+    try(
+        if(m.renderElementPropagation == 3)then(
+            m.renderElementPropagation = 0
+        )
+    )catch()
 
-local count = (getNumSubMtls m)
-if count > 0 then (
-    for i =1 to count do (
-        local subm = (getSubMtl m i)
-        setMtlChannelIdCore subm
+    local count = (getNumSubMtls m)
+    if count > 0 then (
+        for i =1 to count do (
+            local subm = (getSubMtl m i)
+            setMtlChannelIdCore subm
+        )
     )
-)
-)
+    )
 
-function setCrMtlChannelId = (
-local mtlChannelMap = dotNetObject "System.Collections.Hashtable"
-local mats = sceneMaterials
-for m in mats do (
-    try (
-        setCrMtlChannelIdCore m
-    ) catch ()
-)
+    function setCrMtlChannelId = (
+    local mtlChannelMap = dotNetObject "System.Collections.Hashtable"
+    local mats = sceneMaterials
+    for m in mats do (
+        try (
+            setCrMtlChannelIdCore m
+        ) catch ()
+    )
 )
 function fixCoronaJPGFileIssue =
 (
@@ -2382,7 +2382,7 @@ function setVRayDirtInfo obj radius subdiv = (
         obj._细分 = subdiv
         return true
     ) catch ()
-    )
+)
 
 function isVRayExtraTexExist className = (
     local rem = maxOps.GetCurRenderElementMgr()
@@ -2391,12 +2391,13 @@ function isVRayExtraTexExist className = (
     for i = 0 to n do (
         element= rem.getrenderelement i
         curClassName =  (classof(element) as string)
-        if curClassName == className do (
+        if (curClassName == className and (element.elementname == "material" or element.elementname == "ao" or element.elementname == "color" or element.elementname == "color2"  ))do (
             return true
         )
     )
     return false
-    )
+)
+
 function canUseAOChannel = (
     local aochannel = getVRayExtraTex()
     local dirt = getVRayDirt()
@@ -2626,26 +2627,31 @@ function addMtlChannel args = (
     try (
         rem.SetElementsActive(true)
         local mtlchannel = getVrayMtlID()
-        try(
-            mtlchannel.elementname = "material"
-        )catch(
-            try(
-                mtlchannel.elementName = "material"
-            )catch(
-                return false
+		if (isVRayExtraTexExist mtlchannel.elementname )  then (
+
             )
-        )
+        else(
+            try(
+                mtlchannel.elementname = "material"
+            )catch(
+                try(
+                    mtlchannel.elementName = "material"
+                )catch(
+                    return false
+                )
+            )
 
-        try(
-            mtlchannel.output_type = 1
-        )catch(
-            try(mtlchannel.输出类型 = 1)catch()
-        )
+            try(
+                mtlchannel.output_type = 1
+            )catch(
+                try(mtlchannel.输出类型 = 1)catch()
+            )
 
-        rem.AddRenderElement(mtlchannel)
-        try (mtlchannel.filterOn  = true) catch()
-        try (mtlchannel.filter_on = true) catch()
-        return true
+            rem.AddRenderElement(mtlchannel)
+            try (mtlchannel.filterOn  = true) catch()
+            try (mtlchannel.filter_on = true) catch()
+            return true
+        )
     ) catch (
         return false
     )
@@ -2858,13 +2864,19 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
 
         -- 增加通道
-        checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,590]
-        checkbox checkboxColor "颜色通道" align:#left  pos:[120,590]
-        checkbox checkboxMtl "材质通道" align:#left  pos:[190,590]
-        checkbox checkboxAO "AO"  pos:[260,590]
+        -- checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,590]
+        -- checkbox checkboxColor "颜色通道" align:#left  pos:[120,590]
+        -- checkbox checkboxMtl "材质通道" align:#left  pos:[190,590]
+        -- checkbox checkboxAO "AO"  pos:[260,590]
 
-        spinner spRadiu  aoRadiuCaption  align:#left pos:[320,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
-        spinner spSubdiv "细分" align:#left pos:[430,590] range:[1,1000,16] type:#integer height:20 width:50
+        -- spinner spRadiu  aoRadiuCaption  align:#left pos:[320,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
+        -- spinner spSubdiv "细分" align:#left pos:[430,590] range:[1,1000,16] type:#integer height:20 width:50
+        checkbox checkboxColor "颜色通道" align:#left  pos:[20,590]
+        checkbox checkboxMtl "材质通道" align:#left  pos:[100,590]
+        checkbox checkboxAO "AO"  pos:[190,590]
+
+        spinner spRadiu  aoRadiuCaption  align:#left pos:[260,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
+        spinner spSubdiv "细分" align:#left pos:[390,590] range:[1,1000,16] type:#integer height:20 width:50
 
         -- 增加通道结束
     )
@@ -3498,7 +3510,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
     on btnSubmit pressed do (
         checkClient()
-        resetOutputAndElements()
+        -- resetOutputAndElements()
         local errmsg = ""
         local warnmsg = ""
         visibleProgress(true)
@@ -3670,7 +3682,6 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         if isAutoBackupEnabled then (
             autosave.Enable = false
         )
-
 
         local modifyResult = modifySceneFile args
 
