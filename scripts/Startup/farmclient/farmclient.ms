@@ -1256,13 +1256,13 @@ function modifySceneFile args =
         )
     )catch()
 
-    local deleteOtherChannel = args.Item["delete_other_channel"]
-    if deleteOtherChannel then (
-        try (
-            local rem = MaxOps.GetCurRenderElementMgr()
-            rem.RemoveAllRenderElements()
-        ) catch()
-    )
+    -- local deleteOtherChannel = args.Item["delete_other_channel"]
+    -- if deleteOtherChannel then (
+    --     try (
+    --         local rem = MaxOps.GetCurRenderElementMgr()
+    --         rem.RemoveAllRenderElements()
+    --     ) catch()
+    -- )
 
 
     local gammaCorrection = args.Item["gamma_correction"]
@@ -3657,7 +3657,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         args.Add "lightjob_secondengine" secondEngineList[dropdownlistSecondEngine.selection]
         --- add for color mtl ao elements
 
-        args.Add "delete_other_channel" checkboxDeleteOtherChannel.checked
+        -- args.Add "delete_other_channel" checkboxDeleteOtherChannel.checked
         args.Add "aochannel_enable" checkboxAO.checked
         args.Add "aochannel_radiu" spRadiu.value
         args.Add "aochannel_subdiv" spSubdiv.value
