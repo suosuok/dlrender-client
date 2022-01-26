@@ -3510,7 +3510,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
     on btnSubmit pressed do (
         checkClient()
-        -- resetOutputAndElements()
+        resetOutputAndElements()
         local errmsg = ""
         local warnmsg = ""
         visibleProgress(true)
