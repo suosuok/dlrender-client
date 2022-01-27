@@ -1127,9 +1127,9 @@ fn setCrMtlChannelIdCore m = (
             setMtlChannelIdCore subm
         )
     )
-    )
+)
 
-    function setCrMtlChannelId = (
+function setCrMtlChannelId = (
     local mtlChannelMap = dotNetObject "System.Collections.Hashtable"
     local mats = sceneMaterials
     for m in mats do (
@@ -1138,6 +1138,7 @@ fn setCrMtlChannelIdCore m = (
         ) catch ()
     )
 )
+
 function fixCoronaJPGFileIssue =
 (
     try (
@@ -1148,8 +1149,7 @@ function fixCoronaJPGFileIssue =
             return true
         )
         rendoutputfilename = substring rendoutputfilename 1 (rendoutputfilename.count-1)
-    ) catch (
-    )
+    ) catch ()
 )
 
 function modifyCoronaRendererSetting args =
@@ -1295,12 +1295,14 @@ function getCoronaFiles =
         cr = renderers.current
         if cr.colorMap_lut_enable and cr.colorMap_lut_path != undefined then (
             if cr.colorMap_lut_path.count > 0 then (
-                append files cr.colorMap_lut_path
+                tempFile = mapPaths.getFullFilePath cr.colorMap_lut_path
+                append files tempFile
             )
         )
         if cr.gi_uhdCache_precalcMode == 1 or cr.gi_uhdCache_precalcMode == 2  then (
             if cr.gi_uhdCache_file != undefined and cr.gi_uhdCache_file.count > 0 then (
-                append files cr.gi_uhdCache_file
+                tempFile2 = mapPaths.getFullFilePath cr.gi_uhdCache_file
+                append files tempFile2
             )
         )
     ) catch ()
@@ -1319,7 +1321,7 @@ function createZipFilesList tempdir strtime  renderName =
 
     local tempListFilePath = tempDir + "farm-maxconfig-" +strtime + ".txt"
     -- deleteFile tempListFilePath
-    print tempListFilePath
+
 
     local maxvArr = maxversion()
     local maxvi = maxvArr[1]
@@ -1360,6 +1362,8 @@ function createZipFilesList tempdir strtime  renderName =
 
     str = tempListFilePath
     str = substituteString str "%" "\%"
+
+
     format str to:stream
     close stream
     free stream
