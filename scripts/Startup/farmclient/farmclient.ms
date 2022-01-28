@@ -2631,31 +2631,28 @@ function addMtlChannel args = (
     try (
         rem.SetElementsActive(true)
         local mtlchannel = getVrayMtlID()
-		if (isVRayExtraTexExist mtlchannel.elementname )  then (
 
-            )
-        else(
+        try(
+            mtlchannel.elementname = "material"
+        )catch(
             try(
-                mtlchannel.elementname = "material"
+                mtlchannel.elementName = "material"
             )catch(
-                try(
-                    mtlchannel.elementName = "material"
-                )catch(
-                    return false
-                )
+                return false
             )
-
-            try(
-                mtlchannel.output_type = 1
-            )catch(
-                try(mtlchannel.输出类型 = 1)catch()
-            )
-
-            rem.AddRenderElement(mtlchannel)
-            try (mtlchannel.filterOn  = true) catch()
-            try (mtlchannel.filter_on = true) catch()
-            return true
         )
+
+        try(
+            mtlchannel.output_type = 1
+        )catch(
+            try(mtlchannel.输出类型 = 1)catch()
+        )
+
+        rem.AddRenderElement(mtlchannel)
+        try (mtlchannel.filterOn  = true) catch()
+        try (mtlchannel.filter_on = true) catch()
+        return true
+
     ) catch (
         return false
     )
