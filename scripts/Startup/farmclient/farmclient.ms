@@ -923,19 +923,19 @@ function modifyVraySetting args =
     local colorchannel = args.Item["colorchannel_enable"]
     local mtlchannel = args.Item["mtlchannel_enable"]
 
-    -- if aochannel then (
-    --     addAOChannel args
-    -- )
+    if aochannel then (
+        addAOChannel args
+    )
 
-    -- if colorchannel then (
-    --     addColorChannel args
-    -- )
+    if colorchannel then (
+        addColorChannel args
+    )
 
-    -- if mtlchannel then (
-    --     if (addMtlChannel args) then(
-    --         setMtlChannelId()
-    --     )
-    -- )
+    if mtlchannel then (
+        if (addMtlChannel args) then(
+            setMtlChannelId()
+        )
+    )
 
     try (  -- 单独的渲染通道
         if aochannel or colorchannel then (
@@ -2795,6 +2795,9 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
     local tooltipLight = "先渲染光子，再渲染成图，用来节省渲染时间。"
     local tooltipFrameList = "帧序列示例：\r\n渲染第5和10和15帧例：5 10 15 或5,10,15，空格或者逗号分隔\r\n渲染第1帧到第100帧例：1-100，减号分隔\r\n渲染第1帧到第100帧，隔5帧渲染1帧(1, 6, 11, 16)例：1-100:5 一种格式"
     local cameraSetingHashTable = dotNetObject "System.Collections.Hashtable"
+    local errorLog = ""
+
+
 
     button btnAD "xxx" width:500 height:100 images:#(local_image, undefined,1,1,1,1,1)
 
@@ -2868,19 +2871,20 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
 
         -- 增加通道
-        -- checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,590]
-        -- checkbox checkboxColor "颜色通道" align:#left  pos:[120,590]
-        -- checkbox checkboxMtl "材质通道" align:#left  pos:[190,590]
-        -- checkbox checkboxAO "AO"  pos:[260,590]
+        checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,590]
+        checkbox checkboxColor "颜色通道" align:#left  pos:[120,590]
+        checkbox checkboxMtl "材质通道" align:#left  pos:[190,590]
+        checkbox checkboxAO "AO"  pos:[260,590]
 
-        -- spinner spRadiu  aoRadiuCaption  align:#left pos:[320,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
-        -- spinner spSubdiv "细分" align:#left pos:[430,590] range:[1,1000,16] type:#integer height:20 width:50
-        checkbox checkboxColor "颜色通道" align:#left  pos:[20,590]
-        checkbox checkboxMtl "材质通道" align:#left  pos:[100,590]
-        checkbox checkboxAO "AO"  pos:[190,590]
+        spinner spRadiu  aoRadiuCaption  align:#left pos:[320,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
+        spinner spSubdiv "细分" align:#left pos:[430,590] range:[1,1000,16] type:#integer height:20 width:50
 
-        spinner spRadiu  aoRadiuCaption  align:#left pos:[260,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
-        spinner spSubdiv "细分" align:#left pos:[390,590] range:[1,1000,16] type:#integer height:20 width:50
+        -- checkbox checkboxColor "颜色通道" align:#left  pos:[20,590]
+        -- checkbox checkboxMtl "材质通道" align:#left  pos:[100,590]
+        -- checkbox checkboxAO "AO"  pos:[190,590]
+
+        -- spinner spRadiu  aoRadiuCaption  align:#left pos:[260,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
+        -- spinner spSubdiv "细分" align:#left pos:[390,590] range:[1,1000,16] type:#integer height:20 width:50
 
         -- 增加通道结束
     )
@@ -3644,7 +3648,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
             checkResult = checkMixupMtl rendererName
             warnmsg += checkResult[1]
             if (checkResult[2] != "") then (
-                errorLog += checkResult[2] + ","
+                messageBox checkResult[1]
             )
         )
         progress_step.value = 40
@@ -3661,7 +3665,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         args.Add "lightjob_secondengine" secondEngineList[dropdownlistSecondEngine.selection]
         --- add for color mtl ao elements
 
-        -- args.Add "delete_other_channel" checkboxDeleteOtherChannel.checked
+        args.Add "delete_other_channel" checkboxDeleteOtherChannel.checked
         args.Add "aochannel_enable" checkboxAO.checked
         args.Add "aochannel_radiu" spRadiu.value
         args.Add "aochannel_subdiv" spSubdiv.value
