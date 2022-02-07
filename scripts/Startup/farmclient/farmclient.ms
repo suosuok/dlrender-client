@@ -979,6 +979,58 @@ function modifyVraySetting args =
     true
 )
 
+function isCoronaExtraTexExist className = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        curClassName =  (classof(element) as string)
+        if (curClassName == className and (element.elementname == "material" or element.elementname == "AO" or element.elementname == "Color"  or element.elementname == "aotexture"))do (
+            return true
+        )
+    )
+    return false
+)
+
+function isCoronaAO eleName = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        if ( element.elementname == "AO" or element.elementname == "aotexture")do (
+            return true
+        )
+    )
+    return false
+)
+
+function isCoronaMaterial eleName = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        if ( element.elementname == "material" )do (
+            return true
+        )
+    )
+    return false
+)
+
+function isCoronaColor eleName = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        if ( element.elementname == "Color" )do (
+            return true
+        )
+    )
+    return false
+)
 
 
 function getCoronaTex = (
@@ -1008,26 +1060,34 @@ function addCoronaAOChannel args = (
 
     local aoRadiu = args.Item["aochannel_radiu"]
 
+
+
     try (
         rem.SetElementsActive(true)
         local aochannel = getCoronaTex()
         local dirt = getCoronaAOMap()
         dirt.maxDistance = aoRadiu
         aochannel.texmap = dirt
-        try(
-            aochannel.elementname = "AO"
-        )catch(
-            try(
-                aochannel.elementName = "AO"
-            )catch(
-                return false
-            )
-        )
 
-        try (aochannel.filterOn  = true) catch()
-        try (aochannel.filter_on  = true) catch()
-        rem.AddRenderElement(aochannel)
-        return true
+        if isCoronaAO aochannel.elementname then (
+            print "Has Corona AO pass "
+            return false
+        )else(
+            try(
+                aochannel.elementname = "AO"
+            )catch(
+                try(
+                    aochannel.elementName = "AO"
+                )catch(
+                    return false
+                )
+            )
+
+            try (aochannel.filterOn  = true) catch()
+            try (aochannel.filter_on  = true) catch()
+            rem.AddRenderElement(aochannel)
+            return true
+        )
     ) catch (
         return false
     )
@@ -1052,21 +1112,28 @@ function addCoronaColorChannel args =
     try (
         rem.SetElementsActive(true)
         local colorchannel = getCoronaMaskID()
-        colorchannel.what = 2
-        try(
-            colorchannel.elementname = "Color"
-        )catch(
-            try(
-                colorchannel.elementName = "Color"
-            )catch(
+        if isCoronaColor colorchannel.elementname then (
+            print "Has Corona Color pass "
             return false
-            )
-        )
 
-        rem.AddRenderElement(colorchannel)
-        try (colorchannel.filterOn  = true) catch()
-        try (colorchannel.filter_on = true) catch()
-        return true
+        )else(
+
+            colorchannel.what = 2
+            try(
+                colorchannel.elementname = "Color"
+            )catch(
+                try(
+                    colorchannel.elementName = "Color"
+                )catch(
+                return false
+                )
+            )
+
+            rem.AddRenderElement(colorchannel)
+            try (colorchannel.filterOn  = true) catch()
+            try (colorchannel.filter_on = true) catch()
+            return true
+        )
     ) catch(
         return false
     )
@@ -1093,20 +1160,26 @@ function addCoronaMtlChannel args =
         local mtlchannel = getCoronaMtlID()
         mtlchannel.what = 3
 
-        try(
-            mtlchannel.elementname = "material"
-        )catch(
+        if isCoronaMaterial mtlchannel.elementname then (
+            print "Has Corona Material pass "
+            return false
+        )else (
+            print mtlchannel.elementname
             try(
-                mtlchannel.elementName = "material"
+                mtlchannel.elementname = "material"
             )catch(
-                return false
+                try(
+                    mtlchannel.elementName = "material"
+                )catch(
+                    return false
+                )
             )
-        )
 
-        rem.AddRenderElement(mtlchannel)
-        try (mtlchannel.filterOn  = true) catch()
-        try (mtlchannel.filter_on = true) catch()
-        return true
+            rem.AddRenderElement(mtlchannel)
+            try (mtlchannel.filterOn  = true) catch()
+            try (mtlchannel.filter_on = true) catch()
+            return true
+        )
     ) catch(
         return false
     )
@@ -1256,13 +1329,13 @@ function modifySceneFile args =
         )
     )catch()
 
-    -- local deleteOtherChannel = args.Item["delete_other_channel"]
-    -- if deleteOtherChannel then (
-    --     try (
-    --         local rem = MaxOps.GetCurRenderElementMgr()
-    --         rem.RemoveAllRenderElements()
-    --     ) catch()
-    -- )
+    local deleteOtherChannel = args.Item["delete_other_channel"]
+    if deleteOtherChannel then (
+        try (
+            local rem = MaxOps.GetCurRenderElementMgr()
+            rem.RemoveAllRenderElements()
+        ) catch()
+    )
 
 
     local gammaCorrection = args.Item["gamma_correction"]
@@ -2388,19 +2461,64 @@ function setVRayDirtInfo obj radius subdiv = (
     ) catch ()
 )
 
-function isVRayExtraTexExist className = (
+function isVrayMaterial eleName = (
     local rem = maxOps.GetCurRenderElementMgr()
     local n = rem.NumRenderElements()
     n = n-1
     for i = 0 to n do (
         element= rem.getrenderelement i
-        curClassName =  (classof(element) as string)
-        if (curClassName == className and (element.elementname == "material" or element.elementname == "ao" or element.elementname == "color" or element.elementname == "color2"  ))do (
+        if (element.elementname == "material" or element.elementname == "Material" )do (
+            print "has Material Pass "
             return true
         )
     )
     return false
 )
+
+function isVrayAO eleName = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        if (element.elementname == "ao" or element.elementname == "AO" )do (
+            print "has AO Pass  "
+            return true
+        )
+    )
+    return false
+)
+
+
+function isVrayColor eleName = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        if (element.elementname == "color"  )do (
+            print "has Color Pass  1"
+            return true
+        )
+    )
+    return false
+)
+
+
+function isVrayColor2 eleName = (
+    local rem = maxOps.GetCurRenderElementMgr()
+    local n = rem.NumRenderElements()
+    n = n-1
+    for i = 0 to n do (
+        element= rem.getrenderelement i
+        if ( element.elementname == "color2" )do (
+            print "has Color Pass  2"
+            return true
+        )
+    )
+    return false
+)
+
 
 function canUseAOChannel = (
     local aochannel = getVRayExtraTex()
@@ -2424,24 +2542,29 @@ function addAOChannel args = (
     try (
         rem.SetElementsActive(true)
         local aochannel = getVRayExtraTex()
-        local dirt = getVRayDirt()
-        setVRayExtraTex aochannel dirt
-        setVRayDirtInfo dirt aoRadiu aoSubdiv
 
-        try(
-            aochannel.elementname = "ao"
-        )catch(
+        if isVrayAO aochannel.elementname then (
+            return False
+        )else(
+            local dirt = getVRayDirt()
+            setVRayExtraTex aochannel dirt
+            setVRayDirtInfo dirt aoRadiu aoSubdiv
+
             try(
-                aochannel.elementName = "ao"
+                aochannel.elementname = "ao"
             )catch(
-                return false
+                try(
+                    aochannel.elementName = "ao"
+                )catch(
+                    return false
+                )
             )
-        )
 
-        try (aochannel.filterOn  = true) catch()
-        try (aochannel.filter_on  = true) catch()
-        rem.AddRenderElement(aochannel)
-        return true
+            try (aochannel.filterOn  = true) catch()
+            try (aochannel.filter_on  = true) catch()
+            rem.AddRenderElement(aochannel)
+            return true
+        )
     ) catch (
         return false
     )
@@ -2558,10 +2681,17 @@ function addColorChannel args = (
         if useWireColor then (
             local vrayobj = getVRayWireColor()
             if vrayobj != undefined then (
-                vrayobj.elementname = "color"
-                try (vrayobj.filterOn  = true) catch()
-                try (vrayobj.filter_on  = true) catch()
-                rem.AddRenderElement(vrayobj)
+                if isVrayColor vrayobj.elementname  then(
+                    print "Has Vray Color Pass 1"
+                    return False
+                )
+                else
+                (
+                    vrayobj.elementname = "color"
+                    try (vrayobj.filterOn  = true) catch()
+                    try (vrayobj.filter_on  = true) catch()
+                    rem.AddRenderElement(vrayobj)
+                )
             )
         ) else (
             local vrayobj = getVRayObjectID()
@@ -2574,32 +2704,44 @@ function addColorChannel args = (
                 setVRayObjectIDOutputType vrayobj 1
             )
             if vrayobj != undefined then (
-                try(
-                    vrayobj.elementname = "color"
-                )catch(
+                if isVrayColor vrayobj.elementname  then (
+                    print "Has Vray Color Pass 2"
+                    return False
+                )
+                else (
                     try(
-                        vrayobj.elementName = "color"
+                        vrayobj.elementname = "color"
                     )catch(
-                        return false
+                        try(
+                            vrayobj.elementName = "color"
+                        )catch(
+                            return false
+                        )
                     )
-                )
 
-                try(
-                    vrayobj.output_type  = 1
-                )catch(
-                    try(vrayobj.输出类型 = 1)catch()
+                    try(
+                        vrayobj.output_type  = 1
+                    )catch(
+                        try(vrayobj.输出类型 = 1)catch()
+                    )
+                    try (vrayobj.filterOn  = true) catch()
+                    try (vrayobj.filter_on  = true) catch()
+                    rem.AddRenderElement(vrayobj)
                 )
-                try (vrayobj.filterOn  = true) catch()
-                try (vrayobj.filter_on  = true) catch()
-                rem.AddRenderElement(vrayobj)
             )
             if not isWireColor then (
                 vrayobj = getVRayWireColor()
                 if vrayobj != undefined then (
-                    vrayobj.elementname = "color2"
-                    try (vrayobj.filterOn = true) catch()
-                    try (vrayobj.filter_on = true) catch()
-                    rem.AddRenderElement(vrayobj)
+                    if isVrayColor2 vrayobj.elementname  then (
+                        print "Has Vray Color Pass 3"
+                        return False
+                    )
+                    else (
+                        vrayobj.elementname = "color2"
+                        try (vrayobj.filterOn = true) catch()
+                        try (vrayobj.filter_on = true) catch()
+                        rem.AddRenderElement(vrayobj)
+                    )
                 )
             )
         )
@@ -2630,28 +2772,34 @@ function addMtlChannel args = (
 
     try (
         rem.SetElementsActive(true)
-        local mtlchannel = getVrayMtlID()
+        mtlchannel = getVrayMtlID()
+        if isVrayMaterial mtlchannel.elementname then (
+            print "Has Vray Material Pass "
+            return false
+        )
+        else (
 
-        try(
-            mtlchannel.elementname = "material"
-        )catch(
             try(
-                mtlchannel.elementName = "material"
+                mtlchannel.elementname = "material"
             )catch(
-                return false
+                try(
+                    mtlchannel.elementName = "material"
+                )catch(
+                    return false
+                )
             )
-        )
 
-        try(
-            mtlchannel.output_type = 1
-        )catch(
-            try(mtlchannel.输出类型 = 1)catch()
-        )
+            try(
+                mtlchannel.output_type = 1
+            )catch(
+                try(mtlchannel.输出类型 = 1)catch()
+            )
 
-        rem.AddRenderElement(mtlchannel)
-        try (mtlchannel.filterOn  = true) catch()
-        try (mtlchannel.filter_on = true) catch()
-        return true
+            rem.AddRenderElement(mtlchannel)
+            try (mtlchannel.filterOn  = true) catch()
+            try (mtlchannel.filter_on = true) catch()
+            return true
+        )
 
     ) catch (
         return false
@@ -2720,7 +2868,7 @@ function loadUserSetting rendererName  = (
         args.Add "aochannel_enable" ((getINISetting userSettingFile rendererName "aochannel_enable") as booleanClass)
         args.Add "colorchannel_enable" ((getINISetting userSettingFile rendererName "colorchannel_enable") as booleanClass)
         args.Add "mtlchannel_enable" ((getINISetting userSettingFile rendererName "mtlchannel_enable") as booleanClass)
-        -- args.Add "delete_other_channel" ((getINISetting userSettingFile rendererName "delete_other_channel") as booleanClass)
+        args.Add "delete_other_channel" ((getINISetting userSettingFile rendererName "delete_other_channel") as booleanClass)
         args.Add "use_new_render_mode" ((getINISetting userSettingFile rendererName "use_new_render_mode") as booleanClass)
 
         if rendererName == "vray" then (
@@ -2934,9 +3082,11 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
             originalFileExt = userSelectExt
             fixRenderElementsFileExt()
+
             rendSaveFile = true
             extChanged = true
         )
+        cleanElementsPath()
     )
 
     function loadCameraResolutionModSetting camera_name = (
@@ -3515,7 +3665,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
     on btnSubmit pressed do (
         checkClient()
-        resetOutputAndElements()
+
         local errmsg = ""
         local warnmsg = ""
         visibleProgress(true)
@@ -3605,6 +3755,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         if not continueSubmit then (
             return false
         )
+        try(resetOutputAndElements())catch()
         progress_step.value = 30
         btnSubmit.text = "正在处理文件，请稍后"
         btnSubmit.enabled = false
@@ -3814,33 +3965,107 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 )
 
 
+fn cleanElementsPath = (
+    reManager = maxops.getCurRenderElementMgr()
+
+    if reManager != undefined do
+    (
+        local AR_Elements = #()
+        local AR_ElementProps = #()
+        local AR_ElementFilenames = #()
+        local AR_Elementnames = #()
+        for i = 1 to reManager.numrenderelements() do
+        (
+            local theelement = reManager.getrenderelement (i - 1)
+            if classof theelement != Missing_Render_Element_Plug_in do
+            (
+                append AR_Elements (classof theelement)
+                local a = #()
+                for prop in (getPropNames theelement) do
+                    try(append a (getproperty theelement prop))catch(append a "")
+                append AR_ElementProps a
+                append AR_ElementNames theelement.elementname
+                append AR_ElementFilenames (reManager.GetRenderElementFilename (i - 1))
+            )
+        )
+        print AR_Elements
+        print AR_ElementNames
+        print AR_ElementFilenames
+        print RendOutputFilename
+        reManager.RemoveAllRenderElements()
+        for i = 1 to AR_Elements.count do
+        (
+            reManager.addrenderelement (execute((AR_Elements[i] as string) + "()"))
+            local theelement = reManager.getrenderelement (i - 1)
+
+            for j = 1 to (getPropNames theelement).count do
+                try(setproperty theelement (getPropNames theelement)[j] AR_elementProps[i][j])catch()
+            if AR_ElementFilenames[i] == undefined or AR_ElementFilenames[i] == "" then
+                reManager.SetRenderElementFilename (i-1) ""
+            else
+                try ( reManager.SetRenderElementFilename (i-1) "") catch()
+                reManager.SetRenderElementFilename (i-1) (getFilenamePath AR_ElementFilenames[i] + getFilenameFile AR_ElementFilenames[i] + getFilenameType RendOutputFilename)
+            theelement.elementname = AR_ElementNames[i]
+        )
+    )
+
+
+)
+fn get_bitmapIO_params = (
+
+    -- bmp
+    bmptype = ( BMP.getType() as string )
+    bmpio.setType (bmptype as name)
+
+    --png
+    pngType=  (pngio.getType() as string )
+    pngio.setType (pngType as name)
+
+    -- JPEG
+    jpgQuality ( JPEG.getQuality() as string )
+    jpegio.setQuality = jpgQuality
+
+    -- TGA
+    tgaColorDepth =  ( Targa.getColorDepth() as string )
+    tgaio.setColorDepth (tgaColor as integer)
+
+    --TIFF
+    tiffType = ( TIF.getType() as string )
+    tifio.setType (tifType as name)
+
+    -- RPF
+    rpfColorDepth ( rpf.colorDepth as string )
+    rpf.colorDepth = (rpfColorDepth as integer)
+
+)
 
 fn resetOutputAndElements =(
 
-
-	try ( du.LogMessage("rendOutputFilename_FilenameType =" + ( getFilenameType(rendOutputFilename) as string ) ) )catch()
+    temp_renderoutput = rendOutputFilename
+	try ( print ("rendOutputFilename_FilenameType =" + ( getFilenameType(temp_renderoutput) as string ) ) )catch()
 	if getFilenameType(rendOutputFilename) == ".png" then (
 		rendOutputFilename = ""
-		try ( du.LogMessage("png_libbit =" + (pngio.gettype() as string ) ) )catch()
+		try ( print ("png_libbit =" + (pngio.gettype() as string ) ) )catch()
 
 		png_libbit = pngio.gettype()
 
-		try ( du.LogMessage("png_libbit =" + ( png_libbit as string ) ) )catch()
+		try ( print ("png_libbit =" + ( png_libbit as string ) ) )catch()
 
 		if png_libbit != #true24 then ( pngio.setType #true24 )
 
 		pngio.setType png_libbit
 
-		try ( du.LogMessage("png_libbit =" + (pngio.gettype() as string ) ) )catch()
+		try ( print ("png_libbit =" + (pngio.gettype() as string ) ) )catch()
 
 
 	)else(rendOutputFilename = "")
-
+    get_bitmapIO_params()
 	renderSceneDialog.update()
+
 	rendOutputFilename = temp_renderoutput
 	rendSaveFile = True
-	du.LogMessage("max file new output = " + ( rendOutputFilename as string ))
-	du.LogMessage ("End of reset render output path ")
+	print ("max file new output = " + ( rendOutputFilename as string ))
+	print  ("End of reset render output path ")
 	-- rebuild render output end --
 
 	-- ##  remove elements and add new elements  start ## --
@@ -3867,6 +4092,8 @@ fn resetOutputAndElements =(
 			)
 		)
 		reManager.RemoveAllRenderElements()
+        print AR_ElementFilenames
+        print AR_Elementnames
 		for i = 1 to AR_Elements.count do
 		(
 			reManager.addrenderelement (execute((AR_Elements[i] as string) + "()"))
@@ -3877,12 +4104,14 @@ fn resetOutputAndElements =(
 			if AR_ElementFilenames[i] == undefined or AR_ElementFilenames[i] == "" then
 				reManager.SetRenderElementFilename (i-1) ""
 			else
-				reManager.SetRenderElementFilename (i - 1) (getFilenamePath AR_ElementFilenames[i] + getFilenameFile AR_ElementFilenames[i] + getFilenameType RendOutputFilename)
+                try ( reManager.SetRenderElementFilename (i-1) "") catch()
+				reManager.SetRenderElementFilename (i-1) (getFilenamePath AR_ElementFilenames[i] + getFilenameFile AR_ElementFilenames[i] + getFilenameType RendOutputFilename)
 			theelement.elementname = AR_ElementNames[i]
 		)
 	)
 	renderscenedialog.open()
 	renderscenedialog.close()
+    saveSceneFile()
 )
 
 fn get_image = (
