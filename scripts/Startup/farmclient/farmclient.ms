@@ -3,6 +3,7 @@
 global interNet_image = @"https://mirror-hz.oss-cn-hangzhou.aliyuncs.com/logo/ad.jpg"
 global local_image = ""
 global temp_renderoutput = rendOutputFilename
+global changeExtensionFormat = ".tga"
 struct du (
 
 	fn LogMessage logString = (
@@ -1323,6 +1324,8 @@ function modifySceneFile args =
 
     try (rendUseActiveView = true) catch()
     try (
+        print rendOutputFilename
+        print rendOutputFilename.count
         if rendOutputFilename.count == 0 then (
             rendSaveFile = true
             rendOutputFilename = "c:\\farm-.TGA"
@@ -3054,6 +3057,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
 
     on dropdownlistFileExt selected index do (
+        changeExtensionFormat = extList[index]
         local newFileExt = "." + extList[index]
         if newFileExt != originalFileExt then (
             rendOutputFilename = (getFilenamePath rendOutputFilename) + (getFilenameFile rendOutputFilename) + newFileExt
@@ -3268,6 +3272,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
             )
 
             local filepath = toUpper rendOutputFilename
+            print filepath
             if filepath.count == 0 then (
                 filepath = "C:\\A-.TGA"
                 rendOutputFilename = filepath
@@ -3327,7 +3332,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
             editFrames.text = getFrameString()
 
             if (IDisplayGamma.colorCorrectionMode == #gamma) then (
-                checkboxGamma.checked = true
+                checkboxGamma.checked = false
                 spGamma.enabled = true
                 spGamma.value = IDisplayGamma.gamma
             ) else (
@@ -3755,7 +3760,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         if not continueSubmit then (
             return false
         )
-        try(resetOutputAndElements())catch()
+        resetOutputAndElements changeExtensionFormat
         progress_step.value = 30
         btnSubmit.text = "正在处理文件，请稍后"
         btnSubmit.enabled = false
@@ -3889,6 +3894,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         local tempFilesListPath = createZipFilesList tempdir strtime  renderName
         -- local tempFilesListPath = createZipFilesList tempdir strtime extralFiles renderName
         print (tempFilesListPath )
+        resetOutputAndElements changeExtensionFormat
         if tempFilesListPath.count == 0 then (
             if isAutoBackupEnabled then (
                 autosave.Enable = true
@@ -4011,6 +4017,7 @@ fn cleanElementsPath = (
 
 
 )
+
 fn get_bitmapIO_params = (
 
     -- bmp
@@ -4022,43 +4029,28 @@ fn get_bitmapIO_params = (
     pngio.setType (pngType as name)
 
     -- JPEG
-    jpgQuality ( JPEG.getQuality() as string )
-    jpegio.setQuality = jpgQuality
+    jpgQuality = JPEG.getQuality()
+    jpegio.setQuality ( jpgQuality as integer)
 
     -- TGA
-    tgaColorDepth =  ( Targa.getColorDepth() as string )
-    tgaio.setColorDepth (tgaColor as integer)
+    tgaColorDepth = Targa.getColorDepth()
+    tgaio.setColorDepth (tgaColorDepth as integer)
 
     --TIFF
-    tiffType = ( TIF.getType() as string )
-    tifio.setType (tifType as name)
+    tiffType =  TIF.getType()
+    tifio.setType (tiffType as name)
 
     -- RPF
-    rpfColorDepth ( rpf.colorDepth as string )
+    rpfColorDepth = ( rpf.colorDepth as string )
     rpf.colorDepth = (rpfColorDepth as integer)
 
 )
 
-fn resetOutputAndElements =(
+fn resetOutputAndElements changeExtensionFormat =(
 
     temp_renderoutput = rendOutputFilename
-	try ( print ("rendOutputFilename_FilenameType =" + ( getFilenameType(temp_renderoutput) as string ) ) )catch()
-	if getFilenameType(rendOutputFilename) == ".png" then (
-		rendOutputFilename = ""
-		try ( print ("png_libbit =" + (pngio.gettype() as string ) ) )catch()
+	try ( print ("rendOutputFilename_FilenameType =" + ( changeExtensionFormat as string ) ) )catch()
 
-		png_libbit = pngio.gettype()
-
-		try ( print ("png_libbit =" + ( png_libbit as string ) ) )catch()
-
-		if png_libbit != #true24 then ( pngio.setType #true24 )
-
-		pngio.setType png_libbit
-
-		try ( print ("png_libbit =" + (pngio.gettype() as string ) ) )catch()
-
-
-	)else(rendOutputFilename = "")
     get_bitmapIO_params()
 	renderSceneDialog.update()
 
@@ -4105,6 +4097,7 @@ fn resetOutputAndElements =(
 				reManager.SetRenderElementFilename (i-1) ""
 			else
                 try ( reManager.SetRenderElementFilename (i-1) "") catch()
+                print ( "Output Extension format = " + getFilenameType RendOutputFilename )
 				reManager.SetRenderElementFilename (i-1) (getFilenamePath AR_ElementFilenames[i] + getFilenameFile AR_ElementFilenames[i] + getFilenameType RendOutputFilename)
 			theelement.elementname = AR_ElementNames[i]
 		)
