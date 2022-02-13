@@ -2968,9 +2968,11 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         edittext editFrames "帧序列:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,225] labelOnTop:false height:20
         button labelFrameHelp "帧序列的格式与3dsmax标准格式相同" tooltip:tooltipFrameList pos:[221,225] border:false
         --  先隐藏掉优先帧设置
-        edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20
-        checkbox checkboxPreviewStop "优先帧渲染完成后暂停" pos:[220,250] height:20
+        edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20 visible:false
+        checkbox checkboxPreviewStop "优先帧渲染完成后暂停" pos:[220,250] height:20 visible:false
+        checkbox animationmode "开启动画模式" pos:[20,250] enabled:false
     )
+
 
     group "相机"
     (
