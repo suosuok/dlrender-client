@@ -1,0 +1,417 @@
+[About]
+Type=label
+Label=About
+Category=About Plugin
+CategoryOrder=-1
+Index=0
+Default=3dsmax Plugin for Deadline
+Description=Not configurable
+
+[ConcurrentTasks]
+Type=label
+Label=ConcurrentTasks
+Category=About Plugin
+CategoryOrder=-1
+Index=0
+Default=True
+Description=Not configurable
+
+[RenderExecutable2014]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=0
+Label=3ds Max 2014 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2014\3dsmax.exe
+
+[RenderExecutable2015]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=1
+Label=3ds Max 2015 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2015\3dsmax.exe
+
+[RenderExecutable2016]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=2
+Label=3ds Max 2016 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2016\3dsmax.exe
+
+[RenderExecutable2017]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=3
+Label=3ds Max 2017 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2017\3dsmax.exe
+
+[RenderExecutable2018]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=4
+Label=3ds Max 2018 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmaxio.exe or 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2018\3dsmaxio.exe;C:\Program Files\Autodesk\3ds Max 2018\3dsmax.exe
+
+[RenderExecutable2019]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=5
+Label=3ds Max 2019 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmaxio.exe or 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2019\3dsmaxio.exe;C:\Program Files\Autodesk\3ds Max 2019\3dsmax.exe
+
+[RenderExecutable2020]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=6
+Label=3ds Max 2020 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmaxio.exe or 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2020\3dsmaxio.exe;C:\Program Files\Autodesk\3ds Max 2020\3dsmax.exe
+
+[RenderExecutable2021]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=7
+Label=3ds Max 2021 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmaxio.exe or 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2021\3dsmaxio.exe;C:\Program Files\Autodesk\3ds Max 2021\3dsmax.exe
+
+[RenderExecutable2022]
+Category=3ds Max Render Executables
+CategoryOrder=0
+CategoryIndex=8
+Label=3ds Max 2022 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmaxio.exe or 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max 2022\3dsmaxio.exe;C:\Program Files\Autodesk\3ds Max 2022\3dsmax.exe
+
+[RenderExecutable2014Design]
+Category=3ds Max Design Render Executables
+CategoryOrder=1
+CategoryIndex=0
+Label=3ds Max Design 2014 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max Design 2014\3dsmax.exe
+
+[RenderExecutable2015Design]
+Category=3ds Max Design Render Executables
+CategoryOrder=1
+CategoryIndex=1
+Label=3ds Max Design 2015 Executable
+Type=multilinemultifilename
+Description=The path to the 3dsmax.exe used for rendering on each Worker, use a ; to separate multiple paths.
+Default=C:\Program Files\Autodesk\3ds Max Design 2015\3dsmax.exe
+
+[AlternatePluginIni]
+Category=Render Options
+CategoryOrder=2
+CategoryIndex=0
+Label=Alternate Plugin ini File
+Type=Filename
+Description=Location of alternate plugin ini file.
+Default=
+
+[FailOnExistingMaxProcess]
+Category=Render Options
+Label=Fail On Existing 3dsmax Process
+CategoryOrder=2
+CategoryIndex=1
+Type=Boolean
+Description=Prevent deadline from rendering when 3dsmax is already open.
+Default=False
+
+#[RunCmdWorkaround]
+#Category=Render Options
+#Label=Run Render Sanity Check
+#CategoryOrder=2
+#CategoryIndex=2
+#Type=Boolean
+#Description=If enabled, Deadline will do a quick sanity check with 3dsmaxcmd.exe prior to rendering to ensure 3dsmax is properly set up for network rendering.
+#Default=True
+
+[KillWsCommCntrProcesses]
+Category=Render Options
+Label=Kill ADSK Comms Center Process
+CategoryOrder=2
+CategoryIndex=3
+Type=Boolean
+Description=If enabled, Deadline will kill Autodesk Communications Center process if it's running during network rendering.
+Default=False
+
+[DisableAltOutput]
+Category=Render Options
+Label=Disable Saving Output To Alternate File Name
+CategoryOrder=2
+CategoryIndex=4
+Type=Boolean
+Description=If enabled, Deadline won't try to rename the output file(s) if it is unable to save the output to its default file name.
+Default=False
+
+[EnableAssetFilePathMapping]
+Category=Render Options
+Label=Enable Asset File Path Mapping
+CategoryOrder=2
+CategoryIndex=5
+Type=Boolean
+Description=<html><head/><body><p>Before the scene is loaded, allow the file assets to be remapped to the paths listed in Repository Options. Note: When using this mode and using relative paths, make sure to submit the scene file.</p></body></html>
+Default=False
+
+[UseSecureMode]
+Category=Render Options
+Label=Enable Secure Mode (3ds Max IO only)
+CategoryOrder=2
+CategoryIndex=6
+Type=Boolean
+Description=<html><head/><body><p>If enabled, 3ds Max I/O will operate in secure mode. In this mode, the following applies:<br>* Plugins and .NET assemblies are not loaded unless they have a valid digital signature.<br>* The following functionality is disabled:<br>- Running Python scripts<br>- Running MAXScript on deny list commands such as DOScommands, and registry access<br>- Loading Autodesk Store plugins<br>- Loading user defined MCG assemblies<br>- Executing ActiveX objects<br>- OLE integration<br>* Only whitelisted .NET assemblies and types are loaded and instanced.</p></body></html>
+Default=False
+
+[RunSanityCheckTimeout]
+Category=Timeouts
+CategoryOrder=3
+CategoryIndex=0
+Label=Timeout For Running Render Sanity Check
+Type=Integer
+Minimum=15
+Description=Maximum time to run a quick sanity check with 3dsmaxcmd.exe prior to rendering to ensure 3dsmax is properly set up for network rendering, in seconds.
+Default=60
+
+[LoadMaxTimeout]
+Category=Timeouts
+CategoryOrder=3
+CategoryIndex=1
+Label=Timeout For Loading 3dsmax
+Type=Integer
+Minimum=1
+Description=Maximum time for 3dsmax to load, in seconds.
+Default=1000
+
+[StartJobTimeout]
+Category=Timeouts
+CategoryOrder=3
+CategoryIndex=2
+Label=Timeout For Starting A Job
+Type=Integer
+Minimum=1
+Description=Maximum time for 3dsmax to start a job, in seconds.
+Default=1000
+
+[RunCustomizeScriptTimeout]
+Category=Timeouts
+CategoryOrder=3
+CategoryIndex=3
+Label=Timeout For Customize.ms Script Execution
+Type=Integer
+Minimum=60
+Description=Maximum time for customize.ms script to execute, in seconds.
+Default=1000
+
+[ProgressUpdateTimeout]
+Category=Timeouts
+CategoryOrder=3
+CategoryIndex=4
+Label=Timeout For Progress Updates
+Type=Integer
+Minimum=1
+Description=Maximum time before progress update times out, in seconds.
+Default=8000
+
+[DBRUseIPAddresses]
+Category=V-Ray DBR, Corona and Mental Ray Satellite Off-Load Rendering
+Label=Use IP Addresses
+CategoryOrder=4
+CategoryIndex=0
+Type=Boolean
+Description=If offloading a V-Ray DBR, Corona or Mental Ray Satellite render to Deadline, Deadline will update the appropriate config file with the host names of the machines that are running the V-Ray Spawner, Corona DRServer or Satellite service. If this is enabled, the IP addresses of the machines will be used instead.
+Default=False
+
+[MentalRaySatPortNumber2014]
+Category=Mental Ray Satellite Off-Load Rendering
+Label=MR Port Number 3ds Max 2014
+CategoryOrder=5
+CategoryIndex=0
+Type=string
+Description=The port number that the master machine will use to communicate to the Mental Ray Satellite Service over TCP/IP. Leave BLANK to use default port.
+Default=
+
+[MentalRaySatPortNumber2015]
+Category=Mental Ray Satellite Off-Load Rendering
+Label=MR Port Number 3ds Max 2015
+CategoryOrder=5
+CategoryIndex=1
+Type=string
+Description=The port number that the master machine will use to communicate to the Mental Ray Satellite Service over TCP/IP. Leave BLANK to use default port.
+Default=
+
+[MentalRaySatPortNumber2016]
+Category=Mental Ray Satellite Off-Load Rendering
+Label=MR Port Number 3ds Max 2016
+CategoryOrder=5
+CategoryIndex=2
+Type=string
+Description=The port number that the master machine will use to communicate to the Mental Ray Satellite Service over TCP/IP. Leave BLANK to use default port.
+Default=
+
+[MentalRaySatPortNumber2017]
+Category=Mental Ray Satellite Off-Load Rendering
+Label=MR Port Number 3ds Max 2017
+CategoryOrder=5
+CategoryIndex=3
+Type=string
+Description=The port number that the master machine will use to communicate to the Mental Ray Satellite Service over TCP/IP. Leave BLANK to use default port.
+Default=
+
+[VRaySpawnerExistingProcess]
+Type=enum
+Category=V-Ray DBR Process Handling
+Label=Handle Existing Spawner Process
+CategoryOrder=6
+CategoryIndex=0
+Items=Fail On Existing Process;Kill On Existing Process
+Description=Either FAIL on existing V-Ray Spawner process or KILL the existing V-Ray Spawner process if already running.
+Default=Fail On Existing Process
+
+[VRayDBRDynamicStart]
+Category=V-Ray DBR Off-Load Rendering
+Label=Dynamic Start
+CategoryOrder=7
+CategoryIndex=0
+Type=Boolean
+Description=If enabled, a V-Ray DBR off-load job will start rendering immediately after TaskId=0 (master machine) has started rendering. With V-Ray v3.2 (min SP2) onwards, Workers dequeuing tasks of this job will start participating in the ongoing render when V-Ray re-scans it's *.cfg file on the master machine. Default: True.
+Default=true
+
+[VRayDBRPortRange]
+Category=V-Ray DBR Off-Load Rendering
+Label=V-Ray Port range
+CategoryOrder=7
+CategoryIndex=1
+Type=string
+Description=The port number (20204) or range (20204-20212) that the master machine will use to communicate to the V-Ray Spawner over TCP/IP. Default: 20204
+Default=20204
+
+[VRayDBRUseLocalMachine]
+Category=V-Ray DBR Off-Load Rendering
+Label=Use local host
+CategoryOrder=7
+CategoryIndex=2
+Type=Boolean
+Description=When enabled, the master TaskId=0 machine (the Worker from which initiates the DR off-load render) will also take part in the rendering calculations. If disabled, this Deadline Worker only organizes the DR process, sending rendering tasks to the Deadline Workers. Default: True.
+Default=true
+
+[VRayDBRTransferMissingAssets]
+Category=V-Ray DBR Off-Load Rendering
+Label=Transfer missing assets
+CategoryOrder=7
+CategoryIndex=3
+Type=Boolean
+Description=This option allows Deadline Workers to automatically download missing rendering assets from the master machine. This includes textures, V-Ray proxy files, IES profiles, GI solution caches (irradiance map, light cache), X-Ref scenes etc. Default: False.
+Default=false
+
+[VRayDBRUseCachedAssets]
+Category=V-Ray DBR Off-Load Rendering
+Label=Use cached assets
+CategoryOrder=7
+CategoryIndex=4
+Type=Boolean
+Description=This option tells the Deadline Workers to keep the downloaded rendering assets between different DR sessions. Default: False.
+Default=false
+
+[VRayDBRCacheLimitType]
+Category=V-Ray DBR Off-Load Rendering
+Label=Cache limit type
+CategoryOrder=7
+CategoryIndex=5
+Type=enum
+Values=None;Age (hours);Size (GB)
+Description=Allows you to specify under what conditions the assets cache is cleaned up. The possible values are: None, Age (hours), Size (GB). Default: None.
+Default=None
+
+[VRayDBRCacheLimit]
+Category=V-Ray DBR Off-Load Rendering
+Label=Cache limit value
+CategoryOrder=7
+CategoryIndex=6
+Type=float
+Minimum=0.0
+Maximum=1000000.0
+DecimalPlaces=1
+Increment=0.1
+Description=The specific value of the limit for the asset cache. This is either hours or GB, depending on the value of Cache limit type. Min:0.0, Max:1000000.0. Default: 100.0.
+Default=100.0
+
+[VRayRTDBRDynamicStart]
+Category=V-Ray RT DBR Off-Load Rendering
+Label=Dynamic RT Start
+CategoryOrder=8
+CategoryIndex=0
+Type=Boolean
+Description=If enabled, a V-Ray RT DBR off-load job will start rendering immediately after TaskId=0 (master machine) has started rendering. With V-Ray v3.2 (min SP2) onwards, Workers dequeuing tasks of this job will start participating in the ongoing render when V-Ray RT re-scans it's *.cfg file on the master machine. Default: True.
+Default=true
+
+[VRayRTDBRPortRange]
+Category=V-Ray RT DBR Off-Load Rendering
+Label=V-Ray RT Port range
+CategoryOrder=8
+CategoryIndex=1
+Type=string
+Description=The port number (20206) or range (20206-20212) that the master machine will use to communicate to the V-Ray RT Spawner over TCP/IP. Default: 20206.
+Default=20206
+
+[VRayRTDBRUseLocalMachine]
+Category=V-Ray RT DBR Off-Load Rendering
+Label=Auto-start local Worker
+CategoryOrder=8
+CategoryIndex=2
+Type=Boolean
+Description=When enabled, the master TaskId=0 machine (the Worker from which initiates the V-Ray RT DR off-load render) will also take part in the rendering calculations. If disabled, this Deadline Worker only organizes the V-Ray RT DR process, sending rendering tasks to the Deadline Workers. Default: True.
+Default=true
+
+[CoronaDrServerExecutable]
+Label=Corona DrServer Executable
+Category=Corona DBR Off-Load Rendering
+CategoryOrder=9
+CategoryIndex=0
+Type=multilinemultifilename
+Default=C:\Program Files (x86)\Corona\DrServer\DrServer.exe;C:\Program Files\Corona\DrServer.exe;C:\Program Files\Corona\DR Server\DrServer.exe;C:\Program Files\Corona\Corona Renderer for 3ds Max\DR Server\DrServer.exe;C:\Program Files\Corona\Corona Renderer for Cinema 4D\DR Server\DrServer.exe
+Description=The path to the Corona DrServer executable file. Enter alternative paths on separate lines.
+
+[CoronaExistingDRProcess]
+Type=enum
+Category=Corona DBR Off-Load Rendering
+Label=Handle Existing DR Process
+CategoryOrder=9
+CategoryIndex=1
+Items=Do Nothing;Fail On Existing Process;Kill On Existing Process
+Description=Either Do Nothing, FAIL on existing DR process or KILL the existing DR process if already running.
+Default=Fail On Existing Process
+
+[CoronaDRServerNoGui]
+Type=Boolean
+Label=DR Server No Gui
+Category=Corona DBR Off-Load Rendering
+CategoryOrder=9
+CategoryIndex=2
+Description=In Corona 1.4 onwards, a ‘–-noGui’ option is available to run the DR Server without UI.
+Default=False
+
+[AbortOnArnoldLicenseFail]
+Type=enum
+Label=Abort On Arnold License Fail
+Category=Arnold Options
+CategoryOrder=10
+CategoryIndex=0
+Items=Always Fail;Never Fail;Use Scene
+Description=If ‘Always Fail’, the render will fail if Arnold cannot get a license. If ‘Never Fail’, Arnold will render with a watermark if it cannot get a license. If ‘Use Scene’, Arnold will render with the value set by the scene. (Only applies when Arnold is the Renderer).
+Default=Always Fail
