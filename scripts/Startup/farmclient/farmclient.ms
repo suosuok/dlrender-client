@@ -1386,7 +1386,7 @@ function getCoronaFiles =
     files
 )
 
-function createZipFilesList tempdir strtime  renderName =
+function createZipFilesList tempdir strtime vfbExtralFiles renderName =
 (
     local allAssetfiles = #()
     ATSOps.Refresh()
@@ -1415,17 +1415,17 @@ function createZipFilesList tempdir strtime  renderName =
         format str to:stream
     )
 
-    -- if extralFiles != undefined then (
-    --     for i = 1 to extralFiles.count do (
-    --         if (StringEndsWith extralFiles[i] "\\") then (
-    --             str = extralFiles[i]+"\n"
-    --         ) else (
-    --             str = extralFiles[i]+"|\n"
-    --         )
-    --         str = substituteString str "%" "\%"
-    --         format str to:stream
-    --     )
-    -- )
+    if vfbExtralFiles != undefined then (
+        for i = 1 to vfbExtralFiles.count do (
+            if (StringEndsWith vfbExtralFiles[i] "\\") then (
+                str = vfbExtralFiles[i]+"\n"
+            ) else (
+                str = vfbExtralFiles[i]+"\n"
+            )
+            str = substituteString str "%" "\%"
+            format str to:stream
+        )
+    )
 
     if renderName == "corona" then (
         local coronaFiles = getCoronaFiles()
@@ -1789,6 +1789,12 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
 
     )
 
+    if renderName == "vray"  then (
+        setINISetting tempIniFilePath "VFB" "vfb_bkgrimgfile" (try((vfbControl #bkgrimgfile)[1])catch(""))
+        setINISetting tempIniFilePath "VFB" "vfb_lutfile" (try((vfbControl #lutfile)[1])catch(""))
+        setINISetting tempIniFilePath "VFB" "vfb_iccfile" (try((vfbControl #iccfile)[1])catch(""))
+        setINISetting tempIniFilePath "VFB" "vfb_ociofile" (try((vfbControl #ociofile)[1])catch(""))
+    )
 
     if renderName == "corona" then (
         setINISetting tempIniFilePath "Properties" "_pass_limit" (args.Item["pass_limit"] as string)
@@ -2011,6 +2017,14 @@ function getFileNameExt filename =
     toUpper ext
 )
 
+function getExtraFiles filepath = (
+    local files = #()
+    filedir = ( getFilenamePath filepath ) + "\\luts\\"
+    print filedir
+    files = getFiles (filedir + "*.*")
+    files
+)
+
 function getVFBExtraFiles =
 (
     local files = #()
@@ -2041,7 +2055,17 @@ function getVFBExtraFiles =
         if item.count > 0 and item[1] != 0 then (
             file = vfbControl #ociofile
             if file.count > 0 and file[1].count > 0 then (
+                print file
                 append files file[1]
+
+                luts = getExtraFiles file[1]
+                if luts != undefined then (
+
+                    for file in luts do (
+                        append files file
+                        print file
+                    )
+                )
             )
         )
         item = vfbControl #bkgr
@@ -2058,6 +2082,7 @@ function getVFBExtraFiles =
             if item.count > 0 and item[1] == "image" then (
                 file = vfbControl #glareimage
                 if file.count > 0 and file[1].count > 0 then (
+
                     append files file[1]
                 )
             ) else (
@@ -3891,10 +3916,11 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         -- local extralFiles = dropdownlistAddonDir.items
         if isVrayRenderer then (
             local vfbExtralFiles = getVFBExtraFiles()
+
             -- extralFiles = extralFiles + vfbExtralFiles
         )
-        local tempFilesListPath = createZipFilesList tempdir strtime  renderName
-        -- local tempFilesListPath = createZipFilesList tempdir strtime extralFiles renderName
+        -- local tempFilesListPath = createZipFilesList tempdir strtime  renderName
+        local tempFilesListPath = createZipFilesList tempdir strtime vfbExtralFiles renderName
         print (tempFilesListPath )
         resetOutputAndElements changeExtensionFormat
         if tempFilesListPath.count == 0 then (
