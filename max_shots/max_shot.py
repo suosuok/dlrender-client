@@ -3,31 +3,13 @@ import os
 import psutil
 import sys
 from argparse import ArgumentParser
-import subprocess
 import shutil
-
-def xcopy(source, dest):
-    r"""
-    假设原始目录结构为这样
-    <source>\123.txt
-    <source>\directory
-    拷贝之后，目标目录结构就是这样
-    <dest>\123.txt
-    <dest>\directory
-    :param source: 原始目录
-    :param dest: 目标目录
-    :return:
-    """
-    if not os.path.isdir(dest):
-        os.makedirs(dest)
-    cmds = 'xcopy "{0}" "{1}" /e /s /y /i'.format(source, dest)
-    subprocess.check_output(cmds, shell=True)
+from PIL import Image
 
 
-
-class MaxShots():
+class MaxShots:
     def __init__(self):
-        self.maxscripts = os.path.join( os.path.dirname(os.path.realpath(sys.executable)),"maxshot.ms")
+        self.maxscripts = os.path.join(os.path.dirname(os.path.realpath(sys.executable)), "maxshot.ms")
 
     def snapShot(self):
         try:
@@ -38,16 +20,6 @@ class MaxShots():
             pass
 
 
-def render():
-    MaxApplication = win32com.client.Dispatch("Max.Application")
-    MaxApplication._FlagAsMethod("Execute")
-    MaxApplication.Execute('rendUseActiveView=true')
-
-def exitMax():
-    MaxApplication = win32com.client.Dispatch("Max.Application")
-    MaxApplication._FlagAsMethod("Execute")
-    MaxApplication.Execute("quitMax #noPrompt")
-
 def get_max_pid():
     pids = psutil.pids()
     for pid in pids:
@@ -56,23 +28,59 @@ def get_max_pid():
             return pid
 
 
-parser = ArgumentParser()
-parser.add_argument("-f", "--file", dest="file", type=str, required=True)
-args = parser.parse_args()
-new_savepath = args.file
-if not os.path.exists(os.path.dirname(new_savepath)):
-    os.makedirs(os.path.dirname(new_savepath))
+def get_size(file):
+    # 获取文件大小:KB
+    size = os.path.getsize(file)
+    return size / 1024
 
-print ("new_savepath = {}".format(new_savepath))
-max_pid = get_max_pid()
-print ("max_pid = {}".format(max_pid))
-local_savepath = "C:\\render_shots\\shot_.jpg"
-if max_pid:
-    if os.path.exists(local_savepath) and os.path.isfile(local_savepath):
-        os.remove(local_savepath)
-    maxshots = MaxShots()
-    maxshots.snapShot()
-    try:
-        shutil.copy(local_savepath, new_savepath )
-    except Exception as e:
-        print (e)
+
+def compress_image(infile, outfile=None, kb=500, step=10, quality=100):
+    """不改变图片尺寸压缩到指定大小
+    :param infile: 压缩源文件
+    :param outfile: 压缩文件保存地址
+    :param kb: 压缩目标，KB
+    :param step: 每次调整的压缩比率
+    :param quality: 初始压缩比率
+    :return: 压缩文件地址，压缩文件大小
+    """
+    if outfile is None:
+        outfile = infile
+    o_size = get_size(infile)
+    if o_size <= kb:
+        im = Image.open(infile)
+        im.save(outfile)
+
+    while o_size > kb:
+        im = Image.open(infile)
+        im.save(outfile, quality=quality)
+        if quality - step < 0:
+            break
+        quality -= step
+        o_size = get_size(outfile)
+
+
+def run():
+    parser = ArgumentParser()
+    parser.add_argument("-f", "--file", dest="file", type=str, required=True)
+    args = parser.parse_args()
+    new_savepath = args.file
+    if not os.path.exists(os.path.dirname(new_savepath)):
+        os.makedirs(os.path.dirname(new_savepath))
+    max_pid = get_max_pid()
+    local_savepath = "C:\\render_shots\\shot_.jpg"
+    if max_pid:
+        if os.path.exists(local_savepath) and os.path.isfile(local_savepath):
+            os.remove(local_savepath)
+        maxshots = MaxShots()
+        maxshots.snapShot()
+        print("snap shot over ")
+        try:
+            # shutil.copy(local_savepath, new_savepath)
+            ## 判断输出文件大小，超过500K的，统一压缩到500k，在输出
+            compress_image(local_savepath, new_savepath)
+        except Exception as e:
+            print(e)
+
+
+if __name__ == '__main__':
+    run()
