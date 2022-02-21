@@ -41,7 +41,7 @@ def start_exe():
     独立启动exe
     此方式可能在IDE里面失效，通过cmd运行和编译可正常运行
     """
-    exe_path = "3dDownload.exe"
+    exe_path = "易舍渲染.exe"
     key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\FarmClient")
     value, type = winreg.QueryValueEx(key, "Installdir")
     client_path = value.replace(r"\resources\client","")
