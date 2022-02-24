@@ -3522,6 +3522,12 @@ class VRaySpawnerProcess( ManagedProcess ):
                     
             self.Plugin.LogInfo( self.Plugin.Prefix + "3ds Max executable: %s" % maxRenderExecutable )
             vraySpawnerExecutable = PathUtils.ChangeFilename( maxRenderExecutable, "vrayspawner" + str(version) + ".exe" )
+            if int(version) > 2021:
+                vraySpawnerExecutable = r"C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax{}\bin\vrayspawner2022.exe".format(
+                    version)
+            else:
+                vraySpawnerExecutable = r"C:\Program Files\Autodesk\3ds Max {}\vrayspawner{}.exe".format(version,
+                                                                                                         version)
             if not os.path.isfile( vraySpawnerExecutable ):
                 self.Plugin.FailRender( self.Plugin.Prefix + "V-Ray Spawner executable does not exist: " + vraySpawnerExecutable )
 
