@@ -4,6 +4,8 @@ global interNet_image = @"https://mirror-hz.oss-cn-hangzhou.aliyuncs.com/logo/ad
 global local_image = ""
 global temp_renderoutput = rendOutputFilename
 global changeExtensionFormat = ".tga"
+global DBR_job = False
+
 struct du (
 
 	fn LogMessage logString = (
@@ -1756,6 +1758,11 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     setINISetting tempIniFilePath "Properties" "numatmospherics" (numAtmospherics as string)
     setINISetting tempIniFilePath "Properties" "rendoutputfilename" rendOutputFilename
 
+    if DBR_job then (
+
+        setINISetting tempIniFilePath "Properties" "nodecount" ( args.Item["node_count"] as string )
+    )
+
     if renderName == "vray" then (
         setINISetting tempIniFilePath "RendererInfo" "RendererName" "vray"
         setINISetting tempIniFilePath "RendererInfo" "vray_gi_on"  ( renderers.current.gi_on as string )
@@ -2948,10 +2955,10 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
     local vrayVersion = ""
     local settingChanged = false
     local strRendererVersion = ""
-
     local iniFilePath = (scriptSelfDir + "\\setting.ini")
     local taskIniFilePath = ""
     local extList = #("TGA","JPG","EXR","PNG","TIF","BMP", "RPF")
+    local nodecount = #("一台","两台","四台")
     local originalFileExt = toUpper(getFilenameType rendOutputFilename)
     local extChanged = false
     -- local freemodeMaxTimeout = getFreeModeTime()
@@ -2969,6 +2976,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
     local tooltipFrameList = "帧序列示例：\r\n渲染第5和10和15帧例：5 10 15 或5,10,15，空格或者逗号分隔\r\n渲染第1帧到第100帧例：1-100，减号分隔\r\n渲染第1帧到第100帧，隔5帧渲染1帧(1, 6, 11, 16)例：1-100:5 一种格式"
     local cameraSetingHashTable = dotNetObject "System.Collections.Hashtable"
     local errorLog = ""
+
+    local rendernodecount = 1
 
 
 
@@ -2996,6 +3005,9 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20 visible:false
         checkbox checkboxPreviewStop "优先帧渲染完成后暂停" pos:[220,250] height:20 visible:false
         checkbox animationmode "开启动画模式" pos:[20,250] enabled:false
+        label labelnodecount "渲染节点数量" pos:[230,250] enabled:true
+        dropdownlist dropdownlistrendernodecount items:nodecount pos:[370,250] width:100
+
     )
 
 
@@ -3119,6 +3131,30 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         )
         cleanElementsPath()
     )
+
+    on dropdownlistrendernodecount selected index do (
+        changecount = nodecount[index]
+        print changecount
+        if changecount != "一台" then (
+            DBR_job = True
+            if changecount == "两台" then (
+                rendernodecount =2
+            )
+            if changecount == "四台" then (
+                rendernodecount =4
+            )
+            if rendererName == "vray" then (
+                renderers.current.system_distributedRender = true
+            )
+            if rendererName == "corona" then (
+                renderers.current.dr_enable=true
+            )
+        )else (
+            DBR_job = False
+            rendernodecount =1
+        )
+    )
+
 
     function loadCameraResolutionModSetting camera_name = (
         local camera_obj = getnodebyname camera_name
@@ -3832,6 +3868,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
             )
         )
         progress_step.value = 40
+        args.Add "node_count" rendernodecount
         args.Add "lightrate" lightRate
         -- 关闭预览帧
 		args.Add "previewframes" editPreviewFrames.text
