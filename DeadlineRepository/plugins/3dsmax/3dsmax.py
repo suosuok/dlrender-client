@@ -1681,7 +1681,7 @@ class MaxController( object ):
     ########################################################################
     def GetDBRSettings( self ):
         # DBR Settings
-        self.DBRUseIPAddresses = self.Plugin.GetBooleanConfigEntryWithDefault( "DBRUseIPAddresses", False )
+        self.DBRUseIPAddresses = True
 
     def GetVrayDBRSettings( self ):
         self.VrayDBRDynamicStart = self.Plugin.GetBooleanConfigEntryWithDefault( "VRayDBRDynamicStart", False )
