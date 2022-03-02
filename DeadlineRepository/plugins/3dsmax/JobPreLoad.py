@@ -15,10 +15,16 @@ class MODIFYINI(object):
 
     def get_mxp_path(self):
         user_home = os.path.expanduser('~')
-        if int(self.version) < 2020 :
-            mxp_path = os.path.join(user_home, r"Documents\3dsMax\3dsMax.mxp")
+        if os.path.exists(user_home):
+            if int(self.version) < 2020 :
+                mxp_path = os.path.join(user_home, r"Documents\3dsMax\3dsMax.mxp")
+            else:
+                mxp_path = os.path.join(user_home, r"Documents\3ds Max {0}\3ds Max {1}.mxp".format(self.version, self.version))
         else:
-            mxp_path = os.path.join(user_home, r"Documents\3ds Max {0}\3ds Max {1}.mxp".format(self.version, self.version))
+            if int(self.version) < 2020 :
+                mxp_path = r"D:\Backup\Documents\3dsMax\3dsMax.mxp"
+            else:
+                mxp_path = r"D:\Backup\Documents\3ds Max {0}\3ds Max {1}.mxp".format(self.version, self.version)
         return mxp_path
 
     def write_ini(self):
