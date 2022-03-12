@@ -1761,6 +1761,8 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     if DBR_job then (
 
         setINISetting tempIniFilePath "Properties" "nodecount" ( args.Item["node_count"] as string )
+    )else(
+        setINISetting tempIniFilePath "Properties" "nodecount" ( 0 as string )
     )
 
     if renderName == "vray" then (
@@ -2940,7 +2942,7 @@ function checkClient = (
 
 )
 
-rollout renderfarmSetting "渲染设置" width:500 height:700
+rollout renderfarmSetting "渲染设置" width:500 height:750
 (
     local rendererName = getCurrentRendererName()
     -- AO 半径默认设置为100
@@ -2958,7 +2960,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
     local iniFilePath = (scriptSelfDir + "\\setting.ini")
     local taskIniFilePath = ""
     local extList = #("TGA","JPG","EXR","PNG","TIF","BMP", "RPF")
-    local nodecount = #("一台","两台","四台")
+    local nodecount = #("经济","加速","极速")
     local originalFileExt = toUpper(getFilenameType rendOutputFilename)
     local extChanged = false
     -- local freemodeMaxTimeout = getFreeModeTime()
@@ -2999,31 +3001,35 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
     group "帧序列配置"
     (
-        edittext editFrames "帧序列:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,225] labelOnTop:false height:20
-        button labelFrameHelp "帧序列的格式与3dsmax标准格式相同" tooltip:tooltipFrameList pos:[221,225] border:false
-        --  先隐藏掉优先帧设置
-        edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20 visible:false
-        checkbox checkboxPreviewStop "优先帧渲染完成后暂停" pos:[220,250] height:20 visible:false
-        checkbox animationmode "开启动画模式" pos:[20,250] enabled:false
-        label labelnodecount "渲染节点数量" pos:[230,250] enabled:true
-        dropdownlist dropdownlistrendernodecount items:nodecount pos:[370,250] width:100
+        checkbox animationmode "开启动画模式" pos:[20,225] enabled:true
+
+        checkbox checkboxPreviewStop "优先帧完成后暂停" pos:[370,225] height:20 visible:false
+
+
+        edittext editFrames "帧序列:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20
+        button labelFrameHelp "帧序列的格式与3dsmax标准格式相同" tooltip:tooltipFrameList pos:[221,250] border:false
+        edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,275] labelOnTop:false height:20 visible:false
+
+
+        label labelnodecount "渲染节点数量" pos:[230,275] enabled:true
+        dropdownlist dropdownlistrendernodecount items:nodecount pos:[370,270] width:100
 
     )
 
 
     group "相机"
     (
-        listbox cameraAll "场景相机列表(双击添加)" pos:[20,300] width:200
-        button buttonCameraAddAll    ">>>" pos:[230,350] toolTip:"添加所有摄像机"
-        button buttonCameraMoveRight "->>" pos:[230,380] toolTip:"添加选中摄像机"
-        button buttonCameraMoveLeft  "<<-" pos:[230,410] toolTip:"去掉选中摄像机"
-        listbox cameraSelected "渲染相机列表(双击删除)" pos:[280,300] width:200
+        listbox cameraAll "场景相机列表(双击添加)" pos:[20,330] width:200
+        button buttonCameraAddAll    ">>>" pos:[230,380] toolTip:"添加所有摄像机"
+        button buttonCameraMoveRight "->>" pos:[230,410] toolTip:"添加选中摄像机"
+        button buttonCameraMoveLeft  "<<-" pos:[230,440] toolTip:"去掉选中摄像机"
+        listbox cameraSelected "渲染相机列表(双击删除)" pos:[280,330] width:200
     )
 
     group "其它设置"
     (
-        label labelFileExt "出图格式"  pos:[20,490]
-        dropdownlist dropdownlistFileExt items:extList pos:[90,488] width:100
+        label labelFileExt "出图格式"  pos:[20,520]
+        dropdownlist dropdownlistFileExt items:extList pos:[90,518] width:100
         --spinner spTaskTimeout  "超时时间(小时)：" toolTip:tooltipTimeout fieldwidth:40 align:#left pos:[300,490] range:[1,24,24] type:#integer height:20
         --label labelAddonDir "缓存文件夹"  pos:[20,515]
         -- 隐藏缓存文件夹
@@ -3032,39 +3038,39 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         -- button btnAddDir "添加"  pos:[370,513]
         -- button btnDeleteDir "删除"  pos:[430,513]
 
-        checkbox checkboxLight "先渲染光子" toolTip:tooltipLight checked:false fieldwidth:40 align:#left pos:[20,520]
-        label labelFirstEngine "首次引擎"  pos:[110,520]
-        dropdownlist dropdownlistFirstEngine items:firstEngineNameList pos:[160,518] width:70 height:18
-        label labelSecondEngine "二次引擎"  pos:[250,520]
-        dropdownlist dropdownlistSecondEngine items:secondEngineNameList pos:[300,518] width:80 height:18
-        label labelLightRate "光子比例"  pos:[385,520]
-        dropdownlist dropdownlistLightRate items:lightRateList pos:[435,518] width:55 height:18
-        edittext editLightFrames "光子帧序列:" fieldWidth:150 pos:[20,545] labelOnTop:false height:16
-        spinner spLightFrame  "每N帧渲染一次光子：" fieldwidth:30 align:#left pos:[330,545] range:[1,1000,1] type:#integer
+        checkbox checkboxLight "先渲染光子" toolTip:tooltipLight checked:false fieldwidth:40 align:#left pos:[20,550]
+        label labelFirstEngine "首次引擎"  pos:[110,550]
+        dropdownlist dropdownlistFirstEngine items:firstEngineNameList pos:[160,550] width:70 height:18
+        label labelSecondEngine "二次引擎"  pos:[250,550]
+        dropdownlist dropdownlistSecondEngine items:secondEngineNameList pos:[300,550] width:80 height:18
+        label labelLightRate "光子比例"  pos:[385,550]
+        dropdownlist dropdownlistLightRate items:lightRateList pos:[435,550] width:55 height:18
+        edittext editLightFrames "光子帧序列:" fieldWidth:150 pos:[20,580] labelOnTop:false height:16
+        spinner spLightFrame  "每N帧渲染一次光子：" fieldwidth:30 align:#left pos:[330,580] range:[1,1000,1] type:#integer
 
 
-        spinner spPassLimit "        过程限制：" align:#left pos:[20,520] range:[0,1048576,0] type:#integer height:20 width:80
-        spinner spTimeHourLimit "时限：" align:#left pos:[250,520] range:[0,239,0] type:#integer height:20 width:45
+        spinner spPassLimit "        过程限制：" align:#left pos:[20,550] range:[0,1048576,0] type:#integer height:20 width:80
+        spinner spTimeHourLimit "时限：" align:#left pos:[250,550] range:[0,239,0] type:#integer height:20 width:45
 
-        label labelHour "时" pos:[330,520]
-        spinner spTimeMinuteLimit "" align:#left pos:[350,520] range:[0,59,0] type:#integer height:20 width:40
-        label labelMinute "分" pos:[400,520]
-        spinner spTimeSecondLimit "" align:#left pos:[420,520] range:[0,59,0] type:#integer height:20 width:40
-        label labelSecond "秒" pos:[470,520]
-        spinner spNoiseLimit "噪点等级限制：" align:#left pos:[20,545] range:[0,1000.0,0] type:#float height:20 width:80
+        label labelHour "时" pos:[330,550]
+        spinner spTimeMinuteLimit "" align:#left pos:[350,550] range:[0,59,0] type:#integer height:20 width:40
+        label labelMinute "分" pos:[400,550]
+        spinner spTimeSecondLimit "" align:#left pos:[420,550] range:[0,59,0] type:#integer height:20 width:40
+        label labelSecond "秒" pos:[470,550]
+        spinner spNoiseLimit "噪点等级限制：" align:#left pos:[20,575] range:[0,1000.0,0] type:#float height:20 width:80
 
-        checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,570]
-        spinner spGamma "" align:#left pos:[160,570] range:[0.1,5.0, 1.0] type:#float height:20 width:50
+        checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,600]
+        spinner spGamma "" align:#left pos:[160,600] range:[0.1,5.0, 1.0] type:#float height:20 width:50
 
 
         -- 增加通道
-        checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,590]
-        checkbox checkboxColor "颜色通道" align:#left  pos:[120,590]
-        checkbox checkboxMtl "材质通道" align:#left  pos:[190,590]
-        checkbox checkboxAO "AO"  pos:[260,590]
+        checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,620]
+        checkbox checkboxColor "颜色通道" align:#left  pos:[120,620]
+        checkbox checkboxMtl "材质通道" align:#left  pos:[190,620]
+        checkbox checkboxAO "AO"  pos:[260,620]
 
-        spinner spRadiu  aoRadiuCaption  align:#left pos:[320,590] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
-        spinner spSubdiv "细分" align:#left pos:[430,590] range:[1,1000,16] type:#integer height:20 width:50
+        spinner spRadiu  aoRadiuCaption  align:#left pos:[320,620] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
+        spinner spSubdiv "细分" align:#left pos:[430,620] range:[1,1000,16] type:#integer height:20 width:50
 
         -- checkbox checkboxColor "颜色通道" align:#left  pos:[20,590]
         -- checkbox checkboxMtl "材质通道" align:#left  pos:[100,590]
@@ -3075,10 +3081,10 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
 
         -- 增加通道结束
     )
-    label progressText "提交进度"  pos:[10,660] visible:false
-    progressBar progress_step color:[0, 100, 181] pos:[65,662] width:430 height:12 visible:false
+    label progressText "提交进度"  pos:[10,690] visible:false
+    progressBar progress_step color:[0, 100, 181] pos:[65,690] width:430 height:12 visible:false
 
-    button btnSubmit "保存并提交渲染"  pos:[200,675]
+    button btnSubmit "保存并提交渲染"  pos:[200,710]
     timer checkSubmitClock "checkSubmitClock" active:false interval:1000 --tick once a second
 
 
@@ -3135,12 +3141,12 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
     on dropdownlistrendernodecount selected index do (
         changecount = nodecount[index]
         print changecount
-        if changecount != "一台" then (
+        if changecount != "经济" then (
             DBR_job = True
-            if changecount == "两台" then (
+            if changecount == "加速" then (
                 rendernodecount =2
             )
-            if changecount == "四台" then (
+            if changecount == "极速" then (
                 rendernodecount =4
             )
             if rendererName == "vray" then (
@@ -3193,6 +3199,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         )
         false
     )
+
     function getAllCameras = (
         local names = #()
         cams = for cam in cameras where (superclassof cam == camera) collect cam
@@ -3206,6 +3213,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         )
         names
     )
+
     function checkCamerasNode camerasName = (
         local camerasLsit = getAllCameras()
         if (findItem camerasLsit camerasName) > 0 then(
@@ -3213,6 +3221,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         )
         false
     )
+
     function getCameraDisplayName camera = (
         local setting = cameraSetingHashTable.Item[camera]
         if setting == undefined then (
@@ -3592,6 +3601,13 @@ rollout renderfarmSetting "渲染设置" width:500 height:700
         lastRendImageAspectRatio = rendImageAspectRatio
         spAspect.enabled = not rendLockImageAspectRatio
         renderSceneDialog.update()
+    )
+
+    on animationmode changed state do(
+        checkboxPreviewStop.visible = state
+        editPreviewFrames.visible = state
+
+
     )
 
     on cameraAll doubleClicked item do (
