@@ -5,6 +5,7 @@ global local_image = ""
 global temp_renderoutput = rendOutputFilename
 global changeExtensionFormat = ".tga"
 global DBR_job = False
+global AnimationRender = False
 
 struct du (
 
@@ -1761,8 +1762,16 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     if DBR_job then (
 
         setINISetting tempIniFilePath "Properties" "nodecount" ( args.Item["node_count"] as string )
+
+
     )else(
         setINISetting tempIniFilePath "Properties" "nodecount" ( 0 as string )
+    )
+
+    if AnimationRender then (
+        setINISetting tempIniFilePath "Properties" "AnimationRender" ( True  as string )
+    )else(
+        setINISetting tempIniFilePath "Properties" "AnimationRender" ( False  as string )
     )
 
     if renderName == "vray" then (
@@ -3606,7 +3615,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
     on animationmode changed state do(
         checkboxPreviewStop.visible = state
         editPreviewFrames.visible = state
-
+        AnimationRender = state
 
     )
 
@@ -4014,7 +4023,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
         arg = " -f " + taskIniFilePath  + " -zip " +  temp_zipfile
         print (arg)
         local returnString  = runcmd apppath arg_array:#(arg)
-        progress_step.value = 80s
+        progress_step.value = 80
         print ("returnString = " + returnString)
         if  returnString == "200" then (
 
@@ -4185,7 +4194,7 @@ fn resetOutputAndElements changeExtensionFormat =(
 	)
 	renderscenedialog.open()
 	renderscenedialog.close()
-    saveSceneFile()
+    -- saveSceneFile()
 )
 
 fn get_image = (
