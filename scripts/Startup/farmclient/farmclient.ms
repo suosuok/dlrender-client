@@ -5,6 +5,7 @@ global local_image = ""
 global temp_renderoutput = rendOutputFilename
 global changeExtensionFormat = ".tga"
 global DBR_job = False
+global AnimationRender = False
 
 struct du (
 
@@ -1761,8 +1762,16 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     if DBR_job then (
 
         setINISetting tempIniFilePath "Properties" "nodecount" ( args.Item["node_count"] as string )
+
+
     )else(
         setINISetting tempIniFilePath "Properties" "nodecount" ( 0 as string )
+    )
+
+    if AnimationRender then (
+        setINISetting tempIniFilePath "Properties" "AnimationRender" ( True  as string )
+    )else(
+        setINISetting tempIniFilePath "Properties" "AnimationRender" ( False  as string )
     )
 
     if renderName == "vray" then (
@@ -3003,16 +3012,15 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
     (
         checkbox animationmode "开启动画模式" pos:[20,225] enabled:true
 
-        checkbox checkboxPreviewStop "优先帧完成后暂停" pos:[370,225] height:20 visible:false
-
-
         edittext editFrames "帧序列:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20
         button labelFrameHelp "帧序列的格式与3dsmax标准格式相同" tooltip:tooltipFrameList pos:[221,250] border:false
         edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,275] labelOnTop:false height:20 visible:false
 
+        checkbox checkboxPreviewStop "优先帧完成后暂停" pos:[230,275] height:20 visible:false
 
         label labelnodecount "渲染节点数量" pos:[230,275] enabled:true
         dropdownlist dropdownlistrendernodecount items:nodecount pos:[370,270] width:100
+
 
     )
 
@@ -3151,6 +3159,11 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
             )
             if rendererName == "vray" then (
                 renderers.current.system_distributedRender = true
+                if renderers.current.imageSampler_type == 3 then (
+                    messageBox("当前抗锯齿采样器类型将强制设置为:Bucket")
+                    renderers.current.imageSampler_type = 1
+                )
+
             )
             if rendererName == "corona" then (
                 renderers.current.dr_enable=true
@@ -3606,7 +3619,16 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
     on animationmode changed state do(
         checkboxPreviewStop.visible = state
         editPreviewFrames.visible = state
+        if state then (
+            labelnodecount.visible = False
+            dropdownlistrendernodecount.visible = False
+        )else (
+            labelnodecount.visible = True
+            dropdownlistrendernodecount.visible = True
+        )
 
+        print state
+        AnimationRender = state
 
     )
 
@@ -4014,7 +4036,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
         arg = " -f " + taskIniFilePath  + " -zip " +  temp_zipfile
         print (arg)
         local returnString  = runcmd apppath arg_array:#(arg)
-        progress_step.value = 80s
+        progress_step.value = 80
         print ("returnString = " + returnString)
         if  returnString == "200" then (
 
@@ -4185,7 +4207,7 @@ fn resetOutputAndElements changeExtensionFormat =(
 	)
 	renderscenedialog.open()
 	renderscenedialog.close()
-    saveSceneFile()
+    -- saveSceneFile()
 )
 
 fn get_image = (
