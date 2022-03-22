@@ -1765,7 +1765,7 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
 
 
     )else(
-        setINISetting tempIniFilePath "Properties" "nodecount" ( 0 as string )
+        setINISetting tempIniFilePath "Properties" "nodecount" ( 1 as string )
     )
 
     if AnimationRender then (
