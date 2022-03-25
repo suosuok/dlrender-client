@@ -34,14 +34,16 @@ def get_size(file):
     return size / 1024
 
 
-def compress_image(infile, outfile=None, kb=500, step=10, quality=100):
+def compress_image(infile, outfile=None, kb=500, step=10, quality=100, base_width=1500):
     """不改变图片尺寸压缩到指定大小
+    首先判断截图大小，小于500K的，直接存，大于500k的，先等于缩放到限制宽度，长度，在另存
     :param infile: 压缩源文件
     :param outfile: 压缩文件保存地址
     :param kb: 压缩目标，KB
     :param step: 每次调整的压缩比率
     :param quality: 初始压缩比率
     :return: 压缩文件地址，压缩文件大小
+    :param base_width: 输出宽度限制，限制输出截图的长于宽，根据长宽比锁定，解决原始图分辨率过大，截图另存失真的问题
     """
     if outfile is None:
         outfile = infile
@@ -52,7 +54,10 @@ def compress_image(infile, outfile=None, kb=500, step=10, quality=100):
 
     while o_size > kb:
         im = Image.open(infile)
-        im.save(outfile, quality=quality)
+        w_percent = base_width / float(im.size[0])
+        h_size = int(float(im.size[1]) * float(w_percent))
+        image = im.resize((base_width, h_size), Image.ANTIALIAS)
+        image.save(outfile, quality=quality)
         if quality - step < 0:
             break
         quality -= step
