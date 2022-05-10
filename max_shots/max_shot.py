@@ -80,9 +80,10 @@ def run():
         maxshots.snapShot()
         print("snap shot over ")
         try:
-            # shutil.copy(local_savepath, new_savepath)
+            new_savepath = os.path.join(os.path.dirname(new_savepath), "shot_ogl.jpg")
+            shutil.copy(local_savepath, new_savepath)
             ## 判断输出文件大小，超过500K的，统一压缩到500k，在输出
-            compress_image(local_savepath, new_savepath)
+            # compress_image(local_savepath, new_savepath)
         except Exception as e:
             print(e)
 
