@@ -1,4 +1,4 @@
-﻿scriptSelfDir = pathConfig.removePathLeaf(getSourceFileName())
+scriptSelfDir = pathConfig.removePathLeaf(getSourceFileName())
 
 global interNet_image = @"https://mirror-hz.oss-cn-hangzhou.aliyuncs.com/logo/ad.jpg"
 global local_image = ""
@@ -1162,7 +1162,7 @@ function addCoronaMtlChannel args =
     try (
         rem.SetElementsActive(true)
         local mtlchannel = getCoronaMtlID()
-        mtlchannel.what = 3
+        mtlchannel.what = 2
 
         if isCoronaMaterial mtlchannel.elementname then (
             print "Has Corona Material pass "
@@ -1918,7 +1918,9 @@ function checkSetting =
     if (findstring currentRenderer "CoronaRenderer") != undefined then (
         return true
     )
-
+    if (findstring currentRenderer "Corona") != undefined then (
+        return true
+    )
     if (findstring currentRenderer "V_Ray_") == undefined then (
         messagebox "当前仅支持VRay渲染器和CR渲染器，其它渲染器请联系客服。        " title:myAppName
         return false
@@ -2396,7 +2398,7 @@ function getCurrentRendererName =
 (
     local currentRenderer = renderers.current as string
 
-    if (findstring currentRenderer "CoronaRenderer") != undefined then (
+    if ( (findstring currentRenderer "CoronaRenderer") != undefined )or ( (findstring currentRenderer "Corona") != undefined ) then (
         return "corona"
     )
 
