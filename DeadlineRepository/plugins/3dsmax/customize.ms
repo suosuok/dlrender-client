@@ -3025,7 +3025,10 @@ try
 				setProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" newlutpath
 			)
 		)catch(DeadlineUtil.WarnMessage (" Not support version low then corona 8  !"))
-
+		try(
+			rendShowVFB=True
+			DeadlineUtil.LogMessage(" show the renderer vfb  " )
+		)catch(DeadlineUtil.LogMessage(" unlock the camera " ))
 	)--end if Corona
 --END CORONA SPECIFIC SETTINGS
 
