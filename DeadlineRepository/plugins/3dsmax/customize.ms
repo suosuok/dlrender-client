@@ -17,6 +17,14 @@ try
 
 	DeadlineUtil.LogMessage ( "  >Assigned renderer: " + (renderers.current as string) )
 
+	-- add for get file and filetype format !
+	fn getFileNameOO file= (
+		local ext = getFilenameType file
+		local bname = getFileNameFile file
+		local result = bname + ext
+		result
+	)
+
 	fn getRendererIdString =
 	(
 		case (renderers.current.classid as string) of
@@ -3007,6 +3015,16 @@ try
 			)catch
 				DeadlineUtil.WarnMessage ( "  --Failed to set Progressive Time Limit to " + timeLimitStr )
 		)
+		try(
+			lutfile =  (getProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" )
+
+
+			if lutfile != undefined then(
+				newlutpath = maxFilePath + ( getFileNameOO lutfile)
+				DeadlineUtil.LogMessage( newlutpath )
+				setProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" newlutpath
+			)
+		)catch(DeadlineUtil.WarnMessage (" Not support version low then corona 8  !"))
 
 	)--end if Corona
 --END CORONA SPECIFIC SETTINGS
