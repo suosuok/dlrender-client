@@ -3024,7 +3024,12 @@ try
 				DeadlineUtil.LogMessage( newlutpath )
 				setProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" newlutpath
 			)
-		)catch(DeadlineUtil.WarnMessage (" Not support version low then corona 8  !"))
+		)catch(
+			lutfile2 =  renderers.current.colorMap_lut_path
+			if lutfile2 != undefined then()
+				newlutpath = maxFilePath + ( getFileNameOO lutfile2 )
+			if ( renderers.current.colorMap_lut_enable) then (renderers.current.colorMap_lut_path = newlutpath ))
+			DeadlineUtil.LogMessage( newlutpath )
 		try(
 			rendShowVFB=True
 			DeadlineUtil.LogMessage(" show the renderer vfb  " )
