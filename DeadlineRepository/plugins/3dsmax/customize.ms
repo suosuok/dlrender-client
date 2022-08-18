@@ -3016,20 +3016,42 @@ try
 				DeadlineUtil.WarnMessage ( "  --Failed to set Progressive Time Limit to " + timeLimitStr )
 		)
 		try(
-			lutfile =  (getProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" )
-
-
-			if lutfile != undefined then(
-				newlutpath = maxFilePath + ( getFileNameOO lutfile)
-				DeadlineUtil.LogMessage( newlutpath )
-				setProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" newlutpath
-			)
-		)catch(
-			lutfile2 =  renderers.current.colorMap_lut_path
-			if lutfile2 != undefined then()
+		    lutfile2 =  renderers.current.colorMap_lut_path
+			if lutfile2 != undefined then(
 				newlutpath = maxFilePath + ( getFileNameOO lutfile2 )
-			if ( renderers.current.colorMap_lut_enable) then (renderers.current.colorMap_lut_path = newlutpath ))
-			DeadlineUtil.LogMessage( newlutpath )
+                if ( renderers.current.colorMap_lut_enable) then (renderers.current.colorMap_lut_path = newlutpath )
+                DeadlineUtil.LogMessage( newlutpath )
+                )
+		)catch(
+            try(
+                lutfile =  (getProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" )
+
+
+                if lutfile != undefined then(
+                    newlutpath = maxFilePath + ( getFileNameOO lutfile)
+                    DeadlineUtil.LogMessage( newlutpath )
+                    setProperty (getProperty renderers.current "colorMap.pipeline") "colorMappingOperator.path" newlutpath
+                )
+            )catch(
+
+				theFiles = getFiles (maxFilePath+"\\*.cube ")
+				if theFiles.count > 0 then(
+					assetLutfile = theFiles[1]
+					DeadlineUtil.LogMessage( "Get Lut file by assets path >> " + assetLutfile  )
+				)
+				try(
+					pipeline = getProperty renderers.current "colorMap.pipeline"
+					while pipeline != undefined do
+					(
+						operatorClass = classOf pipeline
+						if operatorClass == LutOperatorPlugin then exit
+						pipeline = getProperty pipeline "colorMappingOperator.nextOperator"
+					)
+					if pipeline != undefined then setProperty pipeline "colorMappingOperator.path" theFiles[1]
+					DeadlineUtil.LogMessage( "Set Lut file by assets path >> " + theFiles[1]  )
+				)catch( DeadlineUtil.LogMessage( "Set Lut file by assets path  Failed ! >> " ) )
+            )
+        )
 		try(
 			rendShowVFB=True
 			DeadlineUtil.LogMessage(" show the renderer vfb  " )
