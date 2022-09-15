@@ -1,6 +1,6 @@
-# coding=utf-8
+# -- coding: utf-8 --
+
 from __future__ import print_function
-from __future__ import absolute_import
 import clr
 import re
 import traceback
@@ -9,9 +9,9 @@ import hashlib
 import subprocess
 import stat
 import shutil
-import json
-import six
-import time
+import io
+
+from filecmp import dircmp
 
 from System import *
 from System.Collections.Specialized import *
@@ -27,11 +27,16 @@ from FranticX import Environment2
 from Deadline.Plugins import *
 from Deadline.Scripting import *
 
-from filecmp import dircmp
+#######################################################################
+
+pkg_file = os.path.join(RepositoryUtils.GetCustomScriptsDirectory(), "render_shot", "RenderShot.py")
+print("pkg_file = {}".format(pkg_file))
+## exec(open(pkg_file, encoding = 'utf-8').read())
+execfile(pkg_file)
 
 
-def get_local_script_path():
-    return os.environ["RENDERGSCRIPTPATH"]
+#######################################################################
+
 
 ######################################################################
 ## This is the function that Deadline calls to get an instance of the
@@ -43,13 +48,6 @@ def GetDeadlinePlugin():
 
 def CleanupDeadlinePlugin(deadlinePlugin):
     deadlinePlugin.Cleanup()
-
-
-# render shot code added bu guoqi 2020-07-08
-pkg_file = os.path.join(RepositoryUtils.GetCustomScriptsDirectory(), "pkg", "RenderShot.py")
-execfile(pkg_file)
-pkg_file = os.path.join(RepositoryUtils.GetCustomScriptsDirectory(), "pkg", "RGThumbConvert.py")
-execfile(pkg_file)
 
 
 ######################################################################
@@ -90,21 +88,34 @@ class MaxPlugin(DeadlinePlugin):
 
     def MaxStartupAutoUpdate(self, localPath, repoPath):
         updateNeeded = True
-        if os.path.exists(localPath):
+        if os.path.isdir(localPath):
             dcmp = dircmp(localPath, repoPath)
             diffFiles = len(dcmp.diff_files) + len(dcmp.left_only) + len(dcmp.right_only)
             if diffFiles == 0:
                 updateNeeded = False
-        elif not os.path.exists(localPath):
+        elif not os.path.isdir(localPath):
             self.LogInfo("Creating local Max Startup directory...")
             os.makedirs(localPath)
 
         if (updateNeeded):
-            self.LogInfo("Max Startup upgrade detected, copying updated files...")
+            self.LogInfo("Max Startup upgrade detected")
+            localFiles = os.listdir(localPath)
+            if len(localFiles) > 0:
+                self.LogInfo("Removing local files...")
+                for fileName in localFiles:
+                    self.LogInfo("Removing '%s'..." % fileName)
+                    os.remove(os.path.join(localPath, fileName))
+
+            self.LogInfo("Copying updated files...")
             for fileName in os.listdir(repoPath):
-                self.LogInfo("Copying'%s'..." % fileName)
-                shutil.copy2(os.path.join(repoPath, fileName), os.path.join(localPath, fileName))
-            self.LogInfo("3DS Max startup files update completed!")
+                self.LogInfo("Copying '%s'..." % fileName)
+                localFilePath = os.path.join(localPath, fileName)
+                shutil.copy2(os.path.join(repoPath, fileName), localFilePath)
+                try:
+                    os.chmod(localFilePath, stat.S_IWRITE)
+                except:
+                    pass
+            self.LogInfo("Max startup files update completed!")
 
     ## Called by Deadline to initialize the process.
     def InitializeProcess(self):
@@ -137,31 +148,23 @@ class MaxPlugin(DeadlinePlugin):
 
         self.MyMaxController = MaxController(self)
 
-        job = self.MyMaxController.Plugin.GetJob()
-
-        self._LocalRendering = self.GetBooleanPluginInfoEntryWithDefault("_LocalRendering", "")
-        self.LogInfo("_LocalRendering = {}".format(self._LocalRendering))
-        if self._LocalRendering:
-            self.JobOutputLocal = job.GetJobExtraInfoKeyValueWithDefault("JobOutputLocal", "").strip()
-            if not os.path.exists(self.JobOutputLocal):
-                os.makedirs(self.JobOutputLocal)
-            self.LogInfo("JobOutputLocal = {}".format(self.JobOutputLocal))
-
-            self.JobOutputRoot = job.GetJobExtraInfoKeyValueWithDefault("JobOutputRoot", "").strip()
-            self.LogInfo("JobOutputRoot = {}".format(self.JobOutputRoot))
-
         # If this is a DBR job, we can't load max until we know which task we are (which isn't until the RenderTasks phase).
         self.VrayDBRJob = self.GetBooleanPluginInfoEntryWithDefault("VRayDBRJob", False)
         self.VrayRtDBRJob = self.GetBooleanPluginInfoEntryWithDefault("VRayRtDBRJob", False)
         self.MentalRayDBRJob = self.GetBooleanPluginInfoEntryWithDefault("MentalRayDBRJob", False)
+        self.CoronaDBRJob = self.GetBooleanPluginInfoEntryWithDefault("CoronaDBRJob", False)
 
-        if self.VrayDBRJob or self.VrayRtDBRJob or self.MentalRayDBRJob:
+        self.IsDBRJob = self.VrayDBRJob or self.VrayRtDBRJob or self.MentalRayDBRJob or self.CoronaDBRJob
+
+        if self.IsDBRJob:
             if self.VrayDBRJob:
                 self.Prefix = "V-Ray DBR: "
             elif self.VrayRtDBRJob:
                 self.Prefix = "V-Ray RT DBR: "
-            else:
+            elif self.MentalRayDBRJob:
                 self.Prefix = "Mental Ray Satellite: "
+            elif self.CoronaDBRJob:
+                self.Prefix = "Corona DR: "
 
             self.LogInfo(self.Prefix + "Delaying load of 3ds Max until RenderTasks phase")
         else:
@@ -180,7 +183,7 @@ class MaxPlugin(DeadlinePlugin):
         self.LogInfo("End Job called - shutting down 3dsmax plugin")
 
         # Nothing to do during EndJob phase for DBR jobs.
-        if self.VrayDBRJob or self.VrayRtDBRJob or self.MentalRayDBRJob:
+        if self.IsDBRJob:
             return
 
         if self.MyMaxController:
@@ -195,12 +198,11 @@ class MaxPlugin(DeadlinePlugin):
         self.LogInfo("Render Tasks called")
 
         # For V-RayDBRJob jobs, task 0 can't render until all the other tasks have been picked up unless Dynamic Start is enabled.
-        if self.VrayDBRJob or self.VrayRtDBRJob or self.MentalRayDBRJob:
+        if self.IsDBRJob:
 
             if self.GetCurrentTaskId() == "0":
 
                 currentJob = self.GetJob()
-                RepositoryUtils.SetMachineLimitListedSlaves(currentJob.JobId, [])
 
                 slaveName = self.GetCurrentTask().TaskSlaveName
                 self.LogInfo("Releasing DBR job as MASTER has now been elected: %s" % slaveName)
@@ -228,7 +230,7 @@ class MaxPlugin(DeadlinePlugin):
                     self.LogInfo(self.Prefix + "Plugin Config Settings to be applied to local file: vrayrt_dr.cfg")
                     self.LogInfo(self.Prefix + "Port Range: %s" % self.MyMaxController.VrayRtDBRPortRange)
                     self.LogInfo(
-                        self.Prefix + "Auto-Start Local Slave: %s" % self.MyMaxController.VrayRtDBRAutoStartLocalSlave)
+                        self.Prefix + "Auto-Start Local Worker: %s" % self.MyMaxController.VrayRtDBRAutoStartLocalSlave)
                 elif self.MentalRayDBRJob:
                     self.MyMaxController.GetMentalRaySettings()
                     self.LogInfo(
@@ -306,10 +308,10 @@ class MaxPlugin(DeadlinePlugin):
 
                 # Now get the config file.
                 self.MyMaxController.DBRConfigFile = self.MyMaxController.GetDBRConfigFile()
-                backupConfigFile = Path.Combine(self.GetJobsDataDirectory(),
-                                                Path.GetFileName(self.MyMaxController.DBRConfigFile))
+                backupConfigFile = os.path.join(self.GetJobsDataDirectory(),
+                                                os.path.basename(self.MyMaxController.DBRConfigFile))
 
-                if (File.Exists(self.MyMaxController.DBRConfigFile)):
+                if (os.path.isfile(self.MyMaxController.DBRConfigFile)):
 
                     # Check file permissions on config file.
                     fileAtt = os.stat(self.MyMaxController.DBRConfigFile)[0]
@@ -323,9 +325,9 @@ class MaxPlugin(DeadlinePlugin):
                             self.FailRender("FAILED to make the config file writeable. Check Permissions!")
 
                     self.LogInfo(self.Prefix + "Backing up original config file to: " + backupConfigFile)
-                    File.Copy(self.MyMaxController.DBRConfigFile, backupConfigFile, True)
+                    shutil.copy2(self.MyMaxController.DBRConfigFile, backupConfigFile)
                     self.LogInfo(self.Prefix + "Deleting original config file: " + self.MyMaxController.DBRConfigFile)
-                    File.Delete(self.MyMaxController.DBRConfigFile)
+                    os.remove(self.MyMaxController.DBRConfigFile)
                 else:
                     self.LogInfo(
                         self.Prefix + "Skipping backup and deletion of original config file as it does not exist")
@@ -360,16 +362,16 @@ class MaxPlugin(DeadlinePlugin):
                 # Start the 3dsmax job (loads the scene file, etc).
                 self.MyMaxController.StartMaxJob()
 
-                # Render the tasks.
-                self.MyMaxController.RenderTasks()
-
                 if self.CoronaDBRJob:
                     self.MyMaxController.SetupCoronaDR()
 
-                if (File.Exists(backupConfigFile)):
+                # Render the tasks.
+                self.MyMaxController.RenderTasks()
+
+                if (os.path.isfile(backupConfigFile)):
                     self.LogInfo(self.Prefix + "Restoring backup config file: %s to original location: %s" % (
                     backupConfigFile, self.MyMaxController.DBRConfigFile))
-                    File.Copy(backupConfigFile, self.MyMaxController.DBRConfigFile, True)
+                    shutil.copy2(backupConfigFile, self.MyMaxController.DBRConfigFile)
                 else:
                     self.LogWarning(self.Prefix + "Skipping restore of backup config file as it does not exist")
 
@@ -394,13 +396,7 @@ class MaxPlugin(DeadlinePlugin):
                         self.Prefix + "Launching V-Ray Spawner process and waiting for V-Ray DBR render to complete")
                     self.VRaySpawner = VRaySpawnerProcess(self, self.VrayRtDBRJob)
                     self.RunManagedProcess(self.VRaySpawner)
-                elif self.CoronaDBRJob:
-                    # For Corona, launch the Corona DRServer process and wait until we're marked as complete by the master (task 0).
-                    self.LogInfo(
-                        self.Prefix + "Launching Corona DR process and waiting for Corona DR render to complete")
-                    self.CoronaDR = CoronaDRProcess(self)
-                    self.RunManagedProcess(self.CoronaDR)
-                else:
+                elif self.MentalRayDBRJob:
                     # For mental ray DBR, there is nothing to do because the DBR service should already be running.
                     # Just chill until we're marked as complete by the master (task 0).
                     self.LogInfo(self.Prefix + "Waiting for Mental Ray Satellite render to complete")
@@ -408,17 +404,15 @@ class MaxPlugin(DeadlinePlugin):
                         if self.IsCanceled():
                             self.FailRender("Task canceled")
                         SystemUtils.Sleep(5000)
+                elif self.CoronaDBRJob:
+                    # For Corona, launch the Corona DRServer process and wait until we're marked as complete by the master (task 0).
+                    self.LogInfo(
+                        self.Prefix + "Launching Corona DR process and waiting for Corona DR render to complete")
+                    self.CoronaDR = CoronaDRProcess(self)
+                    self.RunManagedProcess(self.CoronaDR)
         else:
             # Render the tasks.
             self.MyMaxController.RenderTasks()
-
-        # Copy local render outpufile to server
-        if self._LocalRendering:
-            self.LogInfo("Try to copy output file to server path")
-            # +++modify by guoqi 2022-06-16+++
-            with SeprateOutput.collect(self.GetJob(), self.GetCurrentTaskId(), self.JobOutputLocal, self.JobOutputRoot):
-                robocopy_retry(self.JobOutputLocal, self.JobOutputRoot, 10, 5)
-            # +++end+++
 
     def MonitoredManagedProcessExit(self, name):
         maxNetworkLog = self.MyMaxController.NetworkLogGet()
@@ -671,6 +665,7 @@ class MaxController(object):
             "18.6.667.0": "3ds Max 2016 + servicepack_sp2",
             "18.7.696.0": "3ds Max 2016 + servicepack_sp3",
             "18.8.739.0": "3ds Max 2016 + servicepack_sp4",
+            "18.9.762.0": "3ds Max 2016 + servicepack_sp5",
             "19.0.1072.0": "3ds Max 2017 base install",
             "19.1.129.0": "3ds Max 2017 + servicepack_sp1",
             "19.2.472.0": "3ds Max 2017 + servicepack_sp2",
@@ -705,7 +700,6 @@ class MaxController(object):
             "23.2.0.2215": "3ds Max 2021 + update 2",
             "23.3.0.3201": "3ds Max 2021 + update 3",
             "24.0.0.923": "3ds Max 2022 base install",
-            "25.0.0.997": "3ds Max 2023 base install"
         }
 
     def Cleanup(self):
@@ -751,7 +745,7 @@ class MaxController(object):
         # # Check .NET FileVersion of Backburner Server as identified in sys env var PATH
         # BBServerExeVersion = None
         # BBServerExecutable = PathUtils.GetApplicationPath( "server.exe" )
-        # if BBServerExecutable == "" or not File.Exists( BBServerExecutable ):
+        # if BBServerExecutable == "" or not os.path.isfile( BBServerExecutable ):
         #     self.Plugin.LogWarning( "Autodesk Backburner server.exe could not be found on this machine, it is required to run Deadline-3dsMax plugin" )
         #     self.Plugin.LogWarning( "Please install or upgrade Backburner on this machine and try again." )
         # else:
@@ -788,29 +782,12 @@ class MaxController(object):
 
         # Figure out the render executable to use for rendering.
         renderExecutableKey = "RenderExecutable" + str(self.Version)
-        maxEdition = ""
+        prettyName = "3ds Max %s" % str(self.Version);
         if self.IsMaxDesign:
             renderExecutableKey = renderExecutableKey + "Design"
-            maxEdition = " Design"
+            prettyName = "3ds Max Design %s" % str(self.Version)
 
-        renderExecutableList = self.Plugin.GetConfigEntry(renderExecutableKey).strip()
-        if SystemUtils.IsRunningOnWindows():
-            if self.ForceBuild == "32bit":
-                self.MaxRenderExecutable = FileUtils.SearchFileListFor32Bit(renderExecutableList)
-                if self.MaxRenderExecutable == "":
-                    self.Plugin.LogWarning("No 32 bit 3ds Max" + maxEdition + " " + str(
-                        self.Version) + " render executable found in the semicolon separated list \"" + renderExecutableList + "\". Checking for any executable that exists instead.")
-            elif self.ForceBuild == "64bit":
-                self.MaxRenderExecutable = FileUtils.SearchFileListFor64Bit(renderExecutableList)
-                if self.MaxRenderExecutable == "":
-                    self.Plugin.LogWarning("No 64 bit 3ds Max" + maxEdition + " " + str(
-                        self.Version) + " render executable found in the semicolon separated list \"" + renderExecutableList + "\". Checking for any executable that exists instead.")
-
-        if self.MaxRenderExecutable == "":
-            self.MaxRenderExecutable = FileUtils.SearchFileList(renderExecutableList)
-            if self.MaxRenderExecutable == "":
-                self.Plugin.FailRender("No 3ds Max" + maxEdition + " " + str(
-                    self.Version) + " render executable found in the semicolon separated list \"" + renderExecutableList + "\". The path to the render executable can be configured from the Plugin Configuration in the Deadline Monitor.")
+        self.MaxRenderExecutable = self.Plugin.GetRenderExecutable(renderExecutableKey, prettyName)
         self.Plugin.LogInfo("Rendering with executable: %s" % self.MaxRenderExecutable)
 
         # Identify if 3dsmaxio executable is being used
@@ -821,13 +798,13 @@ class MaxController(object):
         # Figure out .NET FileVersion of 3dsmax.exe / 3dsmaxio.exe
         MaxExe = FileVersionInfo.GetVersionInfo(self.MaxRenderExecutable)
         SlaveExeVersion = MaxExe.FileVersion
-        self.Plugin.LogInfo("Slave 3ds Max Version: %s" % SlaveExeVersion)
+        self.Plugin.LogInfo("Worker 3ds Max Version: %s" % SlaveExeVersion)
 
         # If known version of 3dsMax, then print out English description of 3dsmax.exe / 3dsmaxio.exe version
         if SlaveExeVersion in self.MaxDescriptionDict:
-            self.Plugin.LogInfo("Slave 3ds Max Description: %s" % self.MaxDescriptionDict[SlaveExeVersion])
+            self.Plugin.LogInfo("Worker 3ds Max Description: %s" % self.MaxDescriptionDict[SlaveExeVersion])
 
-        # If PluginInfoFile key=value pair "SubmittedFromVersion' available in job settings, then if version known in look-up dict, then print out English description of 3dsmax.exe version that job was submitted with.
+        # If PluginInfoFile key=value pair "SubmittedFromVersion" available in job settings, then if version known in look-up dict, then print out English description of 3dsmax.exe version that job was submitted with.
         SubmittedFromVersion = self.Plugin.GetPluginInfoEntryWithDefault("SubmittedFromVersion", "")
         if SubmittedFromVersion != "":
             self.Plugin.LogInfo("Submitted from 3ds Max Version: %s" % SubmittedFromVersion)
@@ -836,7 +813,7 @@ class MaxController(object):
                     "Submitted from 3ds Max Description: %s" % self.MaxDescriptionDict[SubmittedFromVersion])
             if SlaveExeVersion != SubmittedFromVersion:
                 self.Plugin.LogWarning(
-                    "Slave's 3ds Max version is NOT the same as the 3ds Max version that was used to submit this job! Unexpected results may occur!")
+                    "Worker's 3ds Max version is NOT the same as the 3ds Max version that was used to submit this job! Unexpected results may occur!")
 
         self.SubmittedRendererName = self.Plugin.GetPluginInfoEntryWithDefault("SubmittedRendererName", "")
         if self.SubmittedRendererName != "":
@@ -989,9 +966,9 @@ class MaxController(object):
             "DisableProgressUpdateTimeout", False)
         self.Plugin.LogInfo("Progress update timeout disabled: %s" % self.DisableProgressUpdateTimeout)
 
-        # Read in Slave Mode setting.
+        # Read in Worker Mode setting.
         self.UseSlaveMode = self.Plugin.GetBooleanPluginInfoEntryWithDefault("UseSlaveMode", True)
-        self.Plugin.LogInfo("Slave mode enabled: %s" % self.UseSlaveMode)
+        self.Plugin.LogInfo("Worker mode enabled: %s" % self.UseSlaveMode)
 
         # Read in Silent Mode setting.
         self.UseSilentMode = self.Plugin.GetBooleanPluginInfoEntryWithDefault("UseSilentMode", False)
@@ -1019,10 +996,10 @@ class MaxController(object):
         #     self.Hack3dsmaxCommand()
 
         # Set 3dsmax startup filename.
-        self.MaxStartupFile = Path.Combine(self.Plugin.MaxStartupDir, "deadlineStartupMax" + str(self.Version) + ".max")
-        if (not File.Exists(self.MaxStartupFile)):
+        self.MaxStartupFile = os.path.join(self.Plugin.MaxStartupDir, "deadlineStartupMax" + str(self.Version) + ".max")
+        if (not os.path.isfile(self.MaxStartupFile)):
             self.Plugin.FailRender("The 3dsmax start up file %s does not exist" % self.MaxStartupFile)
-        if (not File.Exists(Path.ChangeExtension(self.MaxStartupFile, ".xml"))):
+        if (not os.path.isfile(Path.ChangeExtension(self.MaxStartupFile, ".xml"))):
             self.Plugin.FailRender(
                 "The Backburner xml job file %s does not exist" % Path.ChangeExtension(self.MaxStartupFile, ".xml"))
         self.Plugin.LogInfo("3dsmax start up file: %s" % self.MaxStartupFile)
@@ -1044,30 +1021,30 @@ class MaxController(object):
                 # The 3dsmax.ini file is in the user profile directory if UseUserProfiles is enabled.
                 if (self.Is64Bit):
                     maxDirName = "3dsMaxIO" if self.IsMaxIO else "3dsMax"
-                    self.UserProfileDataPath = Path.Combine(PathUtils.GetLocalApplicationDataPath(),
+                    self.UserProfileDataPath = os.path.join(PathUtils.GetLocalApplicationDataPath(),
                                                             "Autodesk\\" + maxDirName + "\\" + str(
                                                                 self.Version) + " - 64bit\\" + self.LanguageCodeStr)
                 else:
-                    self.UserProfileDataPath = Path.Combine(PathUtils.GetLocalApplicationDataPath(),
+                    self.UserProfileDataPath = os.path.join(PathUtils.GetLocalApplicationDataPath(),
                                                             "Autodesk\\3dsmax\\" + str(
                                                                 self.Version) + " - 32bit\\" + self.LanguageCodeStr)
             else:
                 # The user profile directory is different for the Design version
                 if (self.Is64Bit):
-                    self.UserProfileDataPath = Path.Combine(PathUtils.GetLocalApplicationDataPath(),
+                    self.UserProfileDataPath = os.path.join(PathUtils.GetLocalApplicationDataPath(),
                                                             "Autodesk\\3dsMaxDesign\\" + str(
                                                                 self.Version) + " - 64bit\\" + self.LanguageCodeStr)
                 else:
-                    self.UserProfileDataPath = Path.Combine(PathUtils.GetLocalApplicationDataPath(),
+                    self.UserProfileDataPath = os.path.join(PathUtils.GetLocalApplicationDataPath(),
                                                             "Autodesk\\3dsMaxDesign\\" + str(
                                                                 self.Version) + " - 32bit\\" + self.LanguageCodeStr)
 
             self.Plugin.LogInfo("3dsmax user profile path: %s" % self.UserProfileDataPath)
-            self.MaxIni = Path.Combine(self.UserProfileDataPath, "3dsmax.ini")
+            self.MaxIni = os.path.join(self.UserProfileDataPath, "3dsmax.ini")
 
             self.MaxDataPath = self.UserProfileDataPath
-            self.MaxPlugCfg = Path.Combine(self.UserProfileDataPath, self.LanguageSubDir + "\\plugcfg")
-            networkLogFilePath = Path.Combine(self.UserProfileDataPath, "Network")
+            self.MaxPlugCfg = os.path.join(self.UserProfileDataPath, self.LanguageSubDir + "\\plugcfg")
+            networkLogFilePath = os.path.join(self.UserProfileDataPath, "Network")
         else:
             if self.Version < 2013:
                 self.MaxIni = PathUtils.ChangeFilename(self.MaxRenderExecutable, "3dsmax.ini")
@@ -1075,19 +1052,19 @@ class MaxController(object):
                 self.MaxIni = PathUtils.ChangeFilename(self.MaxRenderExecutable, self.LanguageSubDir + "\\3dsmax.ini")
 
             self.MaxDataPath = Path.GetDirectoryName(self.MaxRenderExecutable)
-            self.MaxPlugCfg = Path.Combine(self.MaxDataPath, Path.GetDirectoryName(self.MaxIni) + "\\plugcfg")
-            networkLogFilePath = Path.Combine(self.MaxDataPath, "Network")
+            self.MaxPlugCfg = os.path.join(self.MaxDataPath, Path.GetDirectoryName(self.MaxIni) + "\\plugcfg")
+            networkLogFilePath = os.path.join(self.MaxDataPath, "Network")
 
         self.Plugin.LogInfo("3dsmax plugcfg directory: %s" % self.MaxPlugCfg)
         self.Plugin.LogInfo("3dsmax network directory: %s" % networkLogFilePath)
 
         # Build the path to the "scripts/startup" and "usermacros" directory
         if self.UseUserProfiles:
-            self.ScriptsStartupPath = Path.Combine(self.UserProfileDataPath, "scripts\\startup")
+            self.ScriptsStartupPath = os.path.join(self.UserProfileDataPath, "scripts\\startup")
             if self.Version >= 2013:
-                self.UserMacroScriptsPath = Path.Combine(self.UserProfileDataPath, "usermacros")
+                self.UserMacroScriptsPath = os.path.join(self.UserProfileDataPath, "usermacros")
             else:
-                self.UserMacroScriptsPath = Path.Combine(self.UserProfileDataPath, "UI\\usermacros")
+                self.UserMacroScriptsPath = os.path.join(self.UserProfileDataPath, "UI\\usermacros")
         else:
             if self.Version >= 2013:
                 self.ScriptsStartupPath = PathUtils.ChangeFilename(self.MaxRenderExecutable, "scripts\\Startup")
@@ -1097,7 +1074,7 @@ class MaxController(object):
                 self.UserMacroScriptsPath = PathUtils.ChangeFilename(self.MaxRenderExecutable, "UI\\usermacros")
 
         # Create the "usermacros" directory path if it doesn't exist.
-        if (not Directory.Exists(self.UserMacroScriptsPath)):
+        if (not os.path.isdir(self.UserMacroScriptsPath)):
             try:
                 Directory.CreateDirectory(self.UserMacroScriptsPath)
                 self.Plugin.LogInfo("Creating usermacros directory path: %s" % self.UserMacroScriptsPath)
@@ -1111,10 +1088,10 @@ class MaxController(object):
 
         if len(scriptFiles) > 0:
             for scriptFile in scriptFiles:
-                tmpFile = Path.GetFileName(scriptFile)
+                tmpFile = os.path.basename(scriptFile)
                 if (tmpFile.startswith("__temp")):
                     try:
-                        File.Delete(scriptFile)
+                        os.remove(scriptFile)
                         self.Plugin.LogInfo("Successfully deleted '__temp' script file: %s" % tmpFile)
                     except:
                         self.Plugin.LogWarning("Could not delete '__temp' script file: %s" % tmpFile)
@@ -1122,7 +1099,7 @@ class MaxController(object):
         self.Plugin.LogInfo("Scripts Startup Directory: %s" % self.ScriptsStartupPath)
 
         # Create the scripts startup directory if it doesn't already exist.
-        if (not Directory.Exists(self.ScriptsStartupPath)):
+        if (not os.path.isdir(self.ScriptsStartupPath)):
             try:
                 Directory.CreateDirectory(self.ScriptsStartupPath)
                 self.Plugin.LogInfo("Created scripts startup directory path: %s" % self.ScriptsStartupPath)
@@ -1130,8 +1107,8 @@ class MaxController(object):
                 self.Plugin.LogWarning("Failed to create scripts startup directory: %s" % self.ScriptsStartupPath)
 
         # Build the path to the Startup Kill Script script
-        self.pluginStartupKillScript = Path.Combine(get_local_script_path(), "killCommCenter.ms")
-        self.StartupKillScript = Path.Combine(self.ScriptsStartupPath, "killCommCenter.ms")
+        self.pluginStartupKillScript = os.path.join(self.Plugin.GetPluginDirectory(), "killCommCenter.ms")
+        self.StartupKillScript = os.path.join(self.ScriptsStartupPath, "killCommCenter.ms")
 
         # Read in Kill ADSK InfoCenter (Communications Center) exe setting.
         self.KillWsCommCntrProcesses = self.Plugin.GetBooleanConfigEntryWithDefault("KillWsCommCntrProcesses", False)
@@ -1140,7 +1117,7 @@ class MaxController(object):
         # If enabled, copy the killCommCenter.ms file to the max_root or userProfile "scripts\\startup" directory
         if self.KillWsCommCntrProcesses:
             try:
-                File.Copy(self.pluginStartupKillScript, self.StartupKillScript, True)
+                shutil.copy2(self.pluginStartupKillScript, self.StartupKillScript)
                 self.Plugin.LogInfo("Copied %s to %s" % (self.pluginStartupKillScript, self.StartupKillScript))
             except:
                 self.Plugin.LogWarning(
@@ -1151,7 +1128,7 @@ class MaxController(object):
         # This is to workaround a bug in 3ds max 2015 that requires Visible=False for Scene Explorer to be hidden when rendering in service mode
         if self.Version >= 2015:
             if self.UseUserProfiles:
-                self.WorkspacePath = Path.Combine(self.UserProfileDataPath, self.LanguageSubDir + "\\UI\\Workspaces")
+                self.WorkspacePath = os.path.join(self.UserProfileDataPath, self.LanguageSubDir + "\\UI\\Workspaces")
             else:
                 self.WorkspacePath = PathUtils.ChangeFilename(self.MaxRenderExecutable,
                                                               self.LanguageSubDir + "\\UI\\Workspaces")
@@ -1159,7 +1136,7 @@ class MaxController(object):
             self.Plugin.LogInfo("Workspace Directory: %s" % self.WorkspacePath)
 
             # Create the workspace directory path if it doesn't exist.
-            if (not Directory.Exists(self.WorkspacePath)):
+            if (not os.path.isdir(self.WorkspacePath)):
                 self.Plugin.LogInfo("Creating workspace directory path: %s" % self.WorkspacePath)
                 Directory.CreateDirectory(self.WorkspacePath)
 
@@ -1175,7 +1152,7 @@ class MaxController(object):
                         self.Plugin.LogInfo("Workspace ini file: %s [Scene Explorer] set to [Visible=False]" % iniFile)
             else:
                 seFileName = "Workspace1.se.ini"
-                seFile = Path.Combine(self.WorkspacePath, seFileName)
+                seFile = os.path.join(self.WorkspacePath, seFileName)
                 writer = File.CreateText(seFile)
                 writer.WriteLine("[Explorer]\n")
                 writer.WriteLine("Visible=False\n")
@@ -1185,17 +1162,17 @@ class MaxController(object):
                 self.Plugin.LogInfo("Workspace1.se.ini file created: [Scene Explorer] set to [Visible=False]")
 
         self.Plugin.LogInfo("3dsmax data path: %s" % self.MaxDataPath)
-        if (File.Exists(self.MaxIni)):
+        if (os.path.isfile(self.MaxIni)):
             self.Plugin.LogInfo("3dsmax ini file: %s" % self.MaxIni)
         else:
             self.Plugin.LogWarning("3dsmax ini file does not exist: %s" % self.MaxIni)
 
         # Create the network log path if it doesn't exist.
-        if (not Directory.Exists(networkLogFilePath)):
+        if (not os.path.isdir(networkLogFilePath)):
             self.Plugin.LogInfo("Creating network log path: %s" % networkLogFilePath)
             Directory.CreateDirectory(networkLogFilePath)
 
-        self.NetworkLogFile = Path.Combine(networkLogFilePath, "Max.log")
+        self.NetworkLogFile = os.path.join(networkLogFilePath, "Max.log")
         self.Plugin.LogInfo("Network log file: %s" % self.NetworkLogFile)
 
         # Create output paths if they don't exist
@@ -1205,8 +1182,8 @@ class MaxController(object):
         # Figure out which plugin ini file to use. First check if there is an override in the plugin info file.
         self.MaxPluginIni = self.Plugin.GetPluginInfoEntryWithDefault("OverridePluginIni", "")
         if (self.MaxPluginIni != ""):
-            self.MaxPluginIni = Path.Combine(get_local_script_path(), self.MaxPluginIni)
-            if (not File.Exists(self.MaxPluginIni)):
+            self.MaxPluginIni = os.path.join(self.Plugin.GetPluginDirectory(), self.MaxPluginIni)
+            if (not os.path.isfile(self.MaxPluginIni)):
                 self.Plugin.FailRender("The alternative plugin ini file %s does not exist" % self.MaxPluginIni)
             self.UsingCustomPluginIni = True
         else:
@@ -1217,22 +1194,22 @@ class MaxController(object):
             else:
                 # Now simply use the plugin ini file in the 3dsmax directory.
                 if self.Version < 2013:
-                    self.MaxPluginIni = Path.Combine(Path.GetDirectoryName(self.MaxRenderExecutable),
+                    self.MaxPluginIni = os.path.join(Path.GetDirectoryName(self.MaxRenderExecutable),
                                                      "pluginnetrender.ini")
-                    if (not File.Exists(self.MaxPluginIni)):
-                        self.MaxPluginIni = Path.Combine(Path.GetDirectoryName(self.MaxRenderExecutable), "plugin.ini")
-                        if (not File.Exists(self.MaxPluginIni)):
+                    if (not os.path.isfile(self.MaxPluginIni)):
+                        self.MaxPluginIni = os.path.join(Path.GetDirectoryName(self.MaxRenderExecutable), "plugin.ini")
+                        if (not os.path.isfile(self.MaxPluginIni)):
                             self.Plugin.FailRender(
                                 "The plugin ini file %s does not exist, and no alternative plugin.ini file was provided" % self.MaxPluginIni)
                 else:
-                    self.MaxPluginIni = Path.Combine(
-                        Path.Combine(Path.GetDirectoryName(self.MaxRenderExecutable), self.LanguageSubDir),
+                    self.MaxPluginIni = os.path.join(
+                        os.path.join(Path.GetDirectoryName(self.MaxRenderExecutable), self.LanguageSubDir),
                         "pluginnetrender.ini")
-                    if (not File.Exists(self.MaxPluginIni)):
-                        self.MaxPluginIni = Path.Combine(
-                            Path.Combine(Path.GetDirectoryName(self.MaxRenderExecutable), self.LanguageSubDir),
+                    if (not os.path.isfile(self.MaxPluginIni)):
+                        self.MaxPluginIni = os.path.join(
+                            os.path.join(Path.GetDirectoryName(self.MaxRenderExecutable), self.LanguageSubDir),
                             "plugin.ini")
-                        if (not File.Exists(self.MaxPluginIni)):
+                        if (not os.path.isfile(self.MaxPluginIni)):
                             self.Plugin.FailRender(
                                 "The plugin ini file %s does not exist, and no alternative plugin.ini file was provided" % self.MaxPluginIni)
 
@@ -1244,20 +1221,20 @@ class MaxController(object):
             # Check if we have to use a user profile ini file as well.
             if (self.UseUserProfiles):
                 # This is based on the MaxData path.
-                self.UserPluginIni = Path.Combine(self.MaxDataPath, "pluginnetrender.ini")
-                if (not File.Exists(self.UserPluginIni)):
-                    self.UserPluginIni = Path.Combine(self.MaxDataPath, "plugin.ini")
-                    if (not File.Exists(self.UserPluginIni)):
-                        self.UserPluginIni = Path.Combine(self.MaxDataPath, "Plugin.UserSettings.ini")
+                self.UserPluginIni = os.path.join(self.MaxDataPath, "pluginnetrender.ini")
+                if (not os.path.isfile(self.UserPluginIni)):
+                    self.UserPluginIni = os.path.join(self.MaxDataPath, "plugin.ini")
+                    if (not os.path.isfile(self.UserPluginIni)):
+                        self.UserPluginIni = os.path.join(self.MaxDataPath, "Plugin.UserSettings.ini")
 
-                if (File.Exists(self.UserPluginIni)):
+                if (os.path.isfile(self.UserPluginIni)):
                     self.Plugin.LogInfo("Including user profile plugin ini: %s" % self.UserPluginIni)
                 else:
                     self.Plugin.LogInfo(
                         "Not including user profile plugin ini because it does not exist: %s" % self.UserPluginIni)
             else:
-                self.UserPluginIni = Path.Combine(self.MaxDataPath, "Plugin.UserSettings.ini")
-                if (File.Exists(self.UserPluginIni)):
+                self.UserPluginIni = os.path.join(self.MaxDataPath, "Plugin.UserSettings.ini")
+                if (os.path.isfile(self.UserPluginIni)):
                     self.Plugin.LogInfo("Including user profile plugin ini: %s" % self.UserPluginIni)
                 else:
                     self.Plugin.LogInfo(
@@ -1265,12 +1242,12 @@ class MaxController(object):
 
         # Determine lightning plugin location.
         if (self.Is64Bit):
-            self.LightningPluginFile = Path.Combine(self.Plugin.MaxStartupDir,
+            self.LightningPluginFile = os.path.join(self.Plugin.MaxStartupDir,
                                                     "lightning64Max" + str(self.Version) + ".dlx")
         else:
-            self.LightningPluginFile = Path.Combine(self.Plugin.MaxStartupDir,
+            self.LightningPluginFile = os.path.join(self.Plugin.MaxStartupDir,
                                                     "lightningMax" + str(self.Version) + ".dlx")
-        if (not File.Exists(self.LightningPluginFile)):
+        if (not os.path.isfile(self.LightningPluginFile)):
             self.Plugin.FailRender("Lightning connection plugin %s does not exist" % self.LightningPluginFile)
         self.Plugin.LogInfo("Lightning connection plugin: %s" % self.LightningPluginFile)
 
@@ -1294,7 +1271,7 @@ class MaxController(object):
         self.NetworkLogStart()
 
         # The LoadSaveSceneScripts setting is what runs the callback script we need to initiate the connection to 3dsmax.
-        if (File.Exists(self.MaxIni)):
+        if (os.path.isfile(self.MaxIni)):
             if (FileUtils.GetIniFileSetting(self.MaxIni, "MAXScript", "LoadSaveSceneScripts", "1") != "1"):
                 self.Plugin.FailRender(
                     "3dsmax.ini setting in [MAXScript], LoadSaveSceneScripts, is disabled - it must be enabled for deadline to render with 3dsmax")
@@ -1323,15 +1300,15 @@ class MaxController(object):
         # This is a workaround for 3dsmax 2010-2012 where the ini file passed to the command line needs to be in the 3dsmax install root folder.
         if self.Version < 2013:
             # This is based on the MaxData path.
-            self.Plugin.LogInfo("Copying " + Path.GetFileName(pluginIni) + " to 3dsmax data path: " + self.MaxDataPath)
+            self.Plugin.LogInfo("Copying " + os.path.basename(pluginIni) + " to 3dsmax data path: " + self.MaxDataPath)
             self.Plugin.LogInfo(
                 "If this fails, make sure that the necessary permissions are set on this folder to allow for this copy to take place")
 
             tempPluginIni = pluginIni
-            newPluginIni = Path.Combine(self.MaxDataPath, Path.GetFileName(pluginIni))
+            newPluginIni = os.path.join(self.MaxDataPath, os.path.basename(pluginIni))
 
-            File.Copy(tempPluginIni, newPluginIni, True)
-            pluginIni = Path.GetFileName(pluginIni)
+            shutil.copy2(tempPluginIni, newPluginIni)
+            pluginIni = os.path.basename(pluginIni)
 
         # Setup the command line parameters, and then start max.
         parameters = ""
@@ -1353,16 +1330,19 @@ class MaxController(object):
                 parameters += " -secure off"
 
         parameters = parameters + " \"" + self.MaxStartupFile + "\""
+
+        should_abort = self.Plugin.GetConfigEntryWithDefault("AbortOnArnoldLicenseFail", "Always Fail")
+        if should_abort == "Always Fail" or should_abort == "Never Fail":
+            self.Plugin.SetProcessEnvironmentVariable("ABORT_ON_ARNOLD_LICENSE_FAIL", should_abort)
+
         self.LaunchMax(self.MaxRenderExecutable, parameters, Path.GetDirectoryName(self.MaxRenderExecutable))
 
         # Wait for max to connect to us.
         self.Plugin.LogInfo("Waiting for connection from 3dsmax")
-
         self.WaitForConnection("3dsmax startup")
 
         # Now get the version of lightning that we're connected to.
         self.MaxSocket.Send("DeadlineStartup")
-
         try:
             version = self.MaxSocket.Receive(500)
             if (version.startswith("ERROR: ")):
@@ -1411,7 +1391,7 @@ class MaxController(object):
                     self.Plugin.FailRender("A MAXScript job must include a script to execute")
                 self.MaxScriptJobScript = self.AuxiliaryFilenames[0]
 
-            if (not File.Exists(self.MaxScriptJobScript)):
+            if (not os.path.isfile(self.MaxScriptJobScript)):
                 self.Plugin.FailRender(
                     "The maxscript submitted with the MAXScript job, \"%s\", does not exist" % self.MaxScriptJobScript)
             self.Plugin.LogInfo("MAXScript to be executed: \"%s\"" % self.MaxScriptJobScript)
@@ -1598,7 +1578,7 @@ class MaxController(object):
         self.PreFrameScript = self.Plugin.GetPluginInfoEntryWithDefault("PreFrameScript", "").strip().strip("\"")
         if (self.PreFrameScript != ""):
             if (not Path.IsPathRooted(self.PreFrameScript)):
-                self.PreFrameScript = Path.Combine(self.Plugin.GetJobsDataDirectory(), self.PreFrameScript)
+                self.PreFrameScript = os.path.join(self.Plugin.GetJobsDataDirectory(), self.PreFrameScript)
             else:
                 self.PreFrameScript = RepositoryUtils.CheckPathMapping(self.PreFrameScript).replace("/", "\\")
             self.Plugin.LogInfo("Pre frame script: \"%s\"" % self.PreFrameScript)
@@ -1607,7 +1587,7 @@ class MaxController(object):
         self.PostFrameScript = self.Plugin.GetPluginInfoEntryWithDefault("PostFrameScript", "").strip().strip("\"")
         if (self.PostFrameScript != ""):
             if (not Path.IsPathRooted(self.PostFrameScript)):
-                self.PostFrameScript = Path.Combine(self.Plugin.GetJobsDataDirectory(), self.PostFrameScript)
+                self.PostFrameScript = os.path.join(self.Plugin.GetJobsDataDirectory(), self.PostFrameScript)
             else:
                 self.PostFrameScript = RepositoryUtils.CheckPathMapping(self.PostFrameScript).replace("/", "\\")
             self.Plugin.LogInfo("Post frame script: \"%s\"" % self.PostFrameScript)
@@ -1616,7 +1596,7 @@ class MaxController(object):
         self.PreLoadScript = self.Plugin.GetPluginInfoEntryWithDefault("PreLoadScript", "").strip().strip("\"")
         if (self.PreLoadScript != ""):
             if (not Path.IsPathRooted(self.PreLoadScript)):
-                self.PreLoadScript = Path.Combine(self.Plugin.GetJobsDataDirectory(), self.PreLoadScript)
+                self.PreLoadScript = os.path.join(self.Plugin.GetJobsDataDirectory(), self.PreLoadScript)
             else:
                 self.PreLoadScript = RepositoryUtils.CheckPathMapping(self.PreLoadScript).replace("/", "\\")
             self.Plugin.LogInfo("Pre load script: \"%s\"" % self.PreLoadScript)
@@ -1625,7 +1605,7 @@ class MaxController(object):
         self.PostLoadScript = self.Plugin.GetPluginInfoEntryWithDefault("PostLoadScript", "").strip().strip("\"")
         if self.PostLoadScript != "":
             if not Path.IsPathRooted(self.PostLoadScript):
-                self.PostLoadScript = Path.Combine(self.Plugin.GetJobsDataDirectory(), self.PostLoadScript)
+                self.PostLoadScript = os.path.join(self.Plugin.GetJobsDataDirectory(), self.PostLoadScript)
             else:
                 self.PostLoadScript = RepositoryUtils.CheckPathMapping(self.PostLoadScript).replace("/", "\\")
             self.Plugin.LogInfo("Post load script: \"%s\"" % self.PostLoadScript)
@@ -1634,30 +1614,13 @@ class MaxController(object):
         self.PathConfigFile = self.Plugin.GetPluginInfoEntryWithDefault("PathConfigFile", "").strip().strip("\"")
         if self.PathConfigFile != "":
             if not Path.IsPathRooted(self.PathConfigFile):
-                self.PathConfigFile = Path.Combine(self.Plugin.GetJobsDataDirectory(), self.PathConfigFile)
+                self.PathConfigFile = os.path.join(self.Plugin.GetJobsDataDirectory(), self.PathConfigFile)
             else:
                 self.PathConfigFile = RepositoryUtils.CheckPathMapping(self.PathConfigFile).replace("/", "\\")
             self.Plugin.LogInfo("Path configuration file (*.mxp): \"%s\"" % self.PathConfigFile)
 
             self.MergePathConfigFile = self.Plugin.GetBooleanPluginInfoEntryWithDefault("MergePathConfigFile", False)
             self.Plugin.LogInfo("Merge configuration file: %d" % self.MergePathConfigFile)
-        else:
-            job = self.Plugin.GetJob()
-            try:
-                self.PathConfigFile = job.GetJobExtraInfoKeyValueWithDefault("mxp_path", "").strip().strip("\"")
-            except:
-                self.PathConfigFile = ""
-
-            if self.PathConfigFile != "":
-                if not Path.IsPathRooted(self.PathConfigFile):
-                    self.PathConfigFile = Path.Combine(self.Plugin.GetJobsDataDirectory(), self.PathConfigFile)
-                else:
-                    self.PathConfigFile = RepositoryUtils.CheckPathMapping(self.PathConfigFile).replace("/", "\\")
-                self.Plugin.LogInfo("Path configuration file (*.mxp): \"%s\"" % self.PathConfigFile)
-
-                self.MergePathConfigFile = self.Plugin.GetBooleanPluginInfoEntryWithDefault("MergePathConfigFile",
-                                                                                            False)
-                self.Plugin.LogInfo("Merge configuration file: %d" % self.MergePathConfigFile)
 
         # Execute pre load script if it is specified.
         if self.PreLoadScript != "":
@@ -1665,15 +1628,13 @@ class MaxController(object):
 
         # A behind-the-scenes pre load script. 3dsMax fails to load the scene if the asset file paths don't exist.
         # This will change the paths in the scene file and if the scene file wasn't submitted it will create a copy.
-        pathMappingScript = os.path.join(get_local_script_path(), "preloadPathMapping.ms")
+        pathMappingScript = os.path.join(self.Plugin.GetPluginDirectory(), "preloadPathMapping.ms")
         slaveInfo = RepositoryUtils.GetSlaveInfo(self.Plugin.GetSlaveName(), True)
-        # pathMapAssets = slaveInfo.IsAWSPortalInstance or self.Plugin.GetBooleanConfigEntryWithDefault( "EnableAssetFilePathMapping", True )
-
-        pathMapAssets = self.Plugin.GetBooleanConfigEntryWithDefault("EnableAssetFilePathMapping", False)
-        self.Plugin.LogInfo("-------------------------------------------------")
-        if File.Exists(pathMappingScript) and pathMapAssets:
+        pathMapAssets = slaveInfo.IsAWSPortalInstance or self.Plugin.GetBooleanConfigEntryWithDefault(
+            "EnableAssetFilePathMapping", True)
+        if os.path.isfile(pathMappingScript) and pathMapAssets:
             self.MaxSocket.Send("SlaveFolders,\"" + self.Plugin.GetJobsDataDirectory().replace("\\",
-                                                                                               "/") + "\",\"" + get_local_script_path().replace(
+                                                                                               "/") + "\",\"" + self.Plugin.GetPluginDirectory().replace(
                 "\\", "/") + "\"")
             newFileName = self.ExecuteMaxScriptFile(pathMappingScript, returnAsString=True)
 
@@ -1682,6 +1643,18 @@ class MaxController(object):
 
         # Load the max file.
         self.LoadMaxFile()
+
+        # A behind-the-scenes post load script.
+        # This will handle the paths that are not registered with the AssetTracker.
+        pathMappingScriptFix = os.path.join(self.Plugin.GetPluginDirectory(), "postloadPathMapping.ms")
+        slaveInfo = RepositoryUtils.GetSlaveInfo(self.Plugin.GetSlaveName(), True)
+        pathMapAssets = slaveInfo.IsAWSPortalInstance or self.Plugin.GetBooleanConfigEntryWithDefault(
+            "EnableAssetFilePathMapping", True)
+        if os.path.isfile(pathMappingScriptFix) and pathMapAssets:
+            self.MaxSocket.Send("SlaveFolders,\"" + self.Plugin.GetJobsDataDirectory().replace("\\",
+                                                                                               "/") + "\",\"" + self.Plugin.GetPluginDirectory().replace(
+                "\\", "/") + "\"")
+            self.ExecuteMaxScriptFile(pathMappingScriptFix)
 
         # Execute post load script if it is specified.
         if self.PostLoadScript != "":
@@ -1692,7 +1665,7 @@ class MaxController(object):
         # Check if we should just skip the rendering part (which might be the case if this is a FumeFX sim).
         if not self.Plugin.GetBooleanPluginInfoEntryWithDefault("SkipRender", False):
 
-            if self.Plugin.VrayDBRJob or self.Plugin.VrayRtDBRJob or self.Plugin.MentalRayDBRJob:
+            if self.Plugin.IsDBRJob:
                 dbrJobFrame = self.Plugin.GetIntegerPluginInfoEntryWithDefault("DBRJobFrame", 0)
                 self.Plugin.LogInfo(self.Plugin.Prefix + "Rendering frame " + str(dbrJobFrame))
 
@@ -1729,18 +1702,6 @@ class MaxController(object):
                 frame = frame + 1
 
             self.Plugin.SetProgress(100.0)
-            # convert output here
-            job = self.Plugin.GetJob()
-            task_id = self.Plugin.GetCurrentTaskId()
-            thumb_frames = [i for i in range(self.StartFrame, self.EndFrame + 1)]
-            logger = self.Plugin.LogInfo
-            try:
-                self.Plugin.LogInfo("convert")
-                thumb_obj = RGThumbConvert(job, task_id, thumb_frames, logger)
-                thumb_obj.try_convert()
-                thumb_obj.try_scan()
-            except:
-                traceback.print_exc()
         else:
             self.Plugin.LogInfo("Skipping frame rendering because 'Disable Frame Rendering' is enabled")
 
@@ -1823,7 +1784,7 @@ class MaxController(object):
     ########################################################################
     def GetDBRSettings(self):
         # DBR Settings
-        self.DBRUseIPAddresses = self.Plugin.GetBooleanConfigEntryWithDefault("DBRUseIPAddresses", False)
+        self.DBRUseIPAddresses = True
 
     def GetVrayDBRSettings(self):
         self.VrayDBRDynamicStart = self.Plugin.GetBooleanConfigEntryWithDefault("VRayDBRDynamicStart", False)
@@ -1843,12 +1804,12 @@ class MaxController(object):
 
     def GetMentalRaySettings(self):
         # Mental Ray Settings
-        self.MentalRaySatPortNumber = self.Plugin.GetConfigEntryWithDefault("MentalRaySatPortNumber%i" % self.Version,"")
+        self.MentalRaySatPortNumber = self.Plugin.GetConfigEntryWithDefault("MentalRaySatPortNumber%i" % self.Version,
+                                                                            "")
 
     def GetCoronaSettings(self):
-        # type: () -> None
+        # Corona DBR Settings
         self.CoronaDRServerNoGui = self.Plugin.GetBooleanConfigEntryWithDefault("CoronaDRServerNoGui", False)
-
 
     def GetDBRMachines(self):
         currentJob = self.Plugin.GetJob()
@@ -1873,39 +1834,35 @@ class MaxController(object):
     def GetDBRConfigFile(self):
         if self.Plugin.VrayDBRJob:
             # Config file is in the plugcfg file, which the MaxController already knows about.
-            configFile = Path.Combine(self.MaxPlugCfg, "vray_dr.cfg")
+            configFile = os.path.join(self.MaxPlugCfg, "vray_dr.cfg")
         elif self.Plugin.VrayRtDBRJob:
             # Config file is in the plugcfg file, which the MaxController already knows about.
-            configFile = Path.Combine(self.MaxPlugCfg, "vrayrt_dr.cfg")
-        elif self.Plugin.CoronaDBRJob:
-            configFile = os.path.join(self.TempFolder, "coronaDRSlaves.txt")
-            self.Plugin.SetProcessEnvironmentVariable("DEADLINE_CORONA_CONFIG_FILE", configFile)
-
-        else:
+            configFile = os.path.join(self.MaxPlugCfg, "vrayrt_dr.cfg")
+        elif self.Plugin.MentalRayDBRJob:
             # Figure out where the max.rayhosts file is located.
             configDirectory = Path.GetDirectoryName(self.MaxRenderExecutable)
 
             # The config directory for the max.rayhosts file is different for different versions of max.
             if self.Version <= 2010:
-                configDirectory = Path.Combine(configDirectory, "mentalray")
+                configDirectory = os.path.join(configDirectory, "mentalray")
             elif self.Version >= 2011:
                 mainDir = configDirectory
-                configDirectory = Path.Combine(self.TempFolder, "mentalRayHosts")
+                configDirectory = os.path.join(self.TempFolder, "mentalRayHosts")
                 if self.Version <= 2014:
                     self.Plugin.SetProcessEnvironmentVariable("MAX2011_MI_ROOT", configDirectory)
                 else:
                     self.Plugin.SetProcessEnvironmentVariable("MAX%i_MI_ROOT" % self.Version, configDirectory)
 
-                rayFile = Path.Combine(configDirectory, "rayrc")
-                if (not Directory.Exists(configDirectory)):
+                rayFile = os.path.join(configDirectory, "rayrc")
+                if (not os.path.isdir(configDirectory)):
                     Directory.CreateDirectory(configDirectory)
 
                 if self.Version >= 2011 and self.Version <= 2012:
-                    mainDir = Path.Combine(mainDir, "mentalimages")
+                    mainDir = os.path.join(mainDir, "mentalimages")
                 else:
-                    mainDir = Path.Combine(mainDir, "NVIDIA")
-                mainRayFile = Path.Combine(mainDir, "rayrc")
-                File.Copy(mainRayFile, rayFile, True)
+                    mainDir = os.path.join(mainDir, "NVIDIA")
+                mainRayFile = os.path.join(mainDir, "rayrc")
+                shutil.copy2(mainRayFile, rayFile)
                 fileLines = File.ReadAllLines(rayFile)
                 newLines = []
                 for line in fileLines:
@@ -1914,7 +1871,10 @@ class MaxController(object):
                     newLines.append(line)
                 File.WriteAllLines(rayFile, newLines)
 
-            configFile = Path.Combine(configDirectory, "max.rayhosts")
+            configFile = os.path.join(configDirectory, "max.rayhosts")
+        elif self.Plugin.CoronaDBRJob:
+            configFile = os.path.join(self.TempFolder, "coronaDRSlaves.txt")
+            self.Plugin.SetProcessEnvironmentVariable("DEADLINE_CORONA_CONFIG_FILE", configFile)
 
         return configFile
 
@@ -1924,9 +1884,9 @@ class MaxController(object):
         for machine in machines:
             if machine != "":
                 writer.WriteLine("%s 1 %s\n" % (machine, self.VrayDBRPortRange))
-        # writer.WriteLine('10.6.22.5 1 20204\n')
+
         writer.WriteLine(
-            "restart_slaves 0\n")  # no point restarting Slave after end of render as the job will be completed and V-Ray Spawner will be shutdown.
+            "restart_slaves 0\n")  # no point restarting Worker after end of render as the job will be completed and V-Ray Spawner will be shutdown.
         writer.WriteLine(
             "list_in_scene 0\n")  # we should never respect the V-Ray spawners as declared/saved in the max scene file.
         writer.WriteLine(
@@ -1985,8 +1945,7 @@ class MaxController(object):
         writer.Close()
 
     def UpdateCoronaConfigFile(self, machines, configFile):
-        # type: (List[str], str) -> None
-        """Write out machine names, one entry per line into configFile."""
+        # Corona - Write out machine names, one entry per line into configFile.
 
         with io.open(configFile, mode="w", encoding="utf-8") as configFileHandle:
             for machine in machines:
@@ -1994,11 +1953,9 @@ class MaxController(object):
                     configFileHandle.write("%s\n" % machine)
 
     def SetupCoronaDR(self):
-        # type: () -> None
         setupScript = os.path.join(self.Plugin.GetPluginDirectory(), "setupCoronaDR.ms")
-        if os.path.isfile(setupScript):
+        if (os.path.isfile(setupScript)):
             self.ExecuteMaxScriptFile(setupScript)
-
 
     def AutoCheckRegistryForLanguage(self, installDirectory, keyName, languageCode, autoDetectedLanguageCode):
         if (autoDetectedLanguageCode == ""):
@@ -2012,7 +1969,7 @@ class MaxController(object):
     def AutoCheckRegistry(self, filenameOnly, keyName, valueName, autoDetectedDirectory):
         if (autoDetectedDirectory == ""):
             tempDirectory = SystemUtils.GetRegistryKeyValue(keyName, valueName, "")
-            if (tempDirectory != "" and File.Exists(Path.Combine(tempDirectory, filenameOnly))):
+            if (tempDirectory != "" and os.path.isfile(os.path.join(tempDirectory, filenameOnly))):
                 autoDetectedDirectory = tempDirectory
         return autoDetectedDirectory
 
@@ -2020,7 +1977,7 @@ class MaxController(object):
     #     cmdExe = "3dsmaxcmdio.exe" if self.IsMaxIO else "3dsmaxcmd.exe"
 
     #     maxCmd = PathUtils.ChangeFilename( self.MaxRenderExecutable, cmdExe )
-    #     if( File.Exists( maxCmd ) ):
+    #     if( os.path.isfile( maxCmd ) ):
     #         line = self.Run3dsmaxCommand( maxCmd )
     #         self.Plugin.LogInfo( "%s returned: %s" % ( cmdExe, line ) )
 
@@ -2084,7 +2041,7 @@ class MaxController(object):
         self.NetworkLogError = ""
         try:
             self.NetworkLogFileSize = 0
-            if File.Exists(self.NetworkLogFile):
+            if os.path.isfile(self.NetworkLogFile):
                 self.NetworkLogFileSize = FileUtils.GetFileSize(self.NetworkLogFile)
 
             if (self.NetworkLogFileSize > 0):
@@ -2108,7 +2065,7 @@ class MaxController(object):
             attempts = 0
             while attempts < 5:
                 try:
-                    if File.Exists(self.NetworkLogFile):
+                    if os.path.isfile(self.NetworkLogFile):
                         stream = FileStream(self.NetworkLogFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
                         reader = StreamReader(stream)
                         if (self.NetworkLogFileSize >= 0):
@@ -2156,15 +2113,16 @@ class MaxController(object):
 
                 if len(notFoundGPUs) > 0:
                     self.Plugin.LogWarning(
-                        "The Slave is overriding its GPU affinity and the following GPUs do not match the Slaves affinity so they will not be used: " + ",".join(
+                        "The Worker is overriding its GPU affinity and the following GPUs do not match the Workers affinity so they will not be used: " + ",".join(
                             notFoundGPUs))
                 if len(resultGPUs) == 0:
-                    self.Plugin.FailRender("The Slave does not have affinity for any of the GPUs specified in the job.")
+                    self.Plugin.FailRender(
+                        "The Worker does not have affinity for any of the GPUs specified in the job.")
             elif gpusPerTask > 0:
                 if gpusPerTask > len(overrideGPUs):
                     self.Plugin.LogWarning(
-                        "The Slave is overriding its GPU affinity and the Slave only has affinity for " + str(
-                            len(overrideGPUs)) + " Slaves of the " + str(gpusPerTask) + " requested.")
+                        "The Worker is overriding its GPU affinity and the Worker only has affinity for " + str(
+                            len(overrideGPUs)) + " Workers of the " + str(gpusPerTask) + " requested.")
                     resultGPUs = overrideGPUs
                 else:
                     resultGPUs = list(overrideGPUs)[:gpusPerTask]
@@ -2185,42 +2143,22 @@ class MaxController(object):
         return resultGPUs
 
     def CreateStartupScript(self, port):
-        # ~ self.StartupMaxScript = Path.Combine( PathUtils.GetSystemTempPath(), "lightning_startup.ms" )
-        # ~ self.Plugin.LogInfo( "Creating startup script: %s" % self.StartupMaxScript )
-
-        # ~ self.ErrorMessageFile = Path.Combine( PathUtils.GetSystemTempPath(), "max_startup_error.txt" )
-        # ~ if( File.Exists( self.ErrorMessageFile ) ):
-        # ~ File.Delete( self.ErrorMessageFile )
-
         self.AuthentificationToken = str(DateTime.Now.TimeOfDay.Ticks)
-
-        # ~ writer = File.CreateText( self.StartupMaxScript )
-        # ~ writer.WriteLine( "if (DeadlineUtil != undefined) then (" )
-        # ~ writer.WriteLine( "  if (DeadlineUtil.RunLightningDaemon %d \"TOKEN:%s\") do" % (port, self.AuthentificationToken) )
-        # ~ writer.WriteLine( "    quitMax #noprompt" )
-        # ~ writer.WriteLine( ") else (" )
-        # ~ writer.WriteLine( "  errorStream = openFile \"%s\" mode:\"w\"" % self.ErrorMessageFile.replace( "\\", "\\\\" ) )
-        # ~ writer.WriteLine( "  if errorStream == undefined then (" )
-        # ~ writer.WriteLine( "    -- how should this failure be signaled?" )
-        # ~ writer.WriteLine( "  ) else (" )
-        # ~ writer.WriteLine( "    format \"Deadline 3dsmax startup error: lightningMax.dlx does not appear to have loaded on 3dsmax startup, check that it is the right version and installed to the right place.\" to:errorStream" )
-        # ~ writer.WriteLine( "    close errorStream" )
-        # ~ writer.WriteLine( "  )" )
-        # ~ writer.WriteLine( "  quitMax #noprompt" )
-        # ~ writer.WriteLine( ") -- RunLightningDaemon not defined" )
-        # ~ writer.Close()
 
         self.Plugin.LogInfo("Setting up startup environment")
         self.Plugin.SetProcessEnvironmentVariable("DEADLINE_MAX_PORT", str(port))
         self.Plugin.SetProcessEnvironmentVariable("DEADLINE_MAX_TOKEN", self.AuthentificationToken)
+        self.Plugin.LogInfo("Setting NW_ROOT_PATH to '%s' for this session" % self.TempFolder)
         self.Plugin.SetProcessEnvironmentVariable("NW_ROOT_PATH", self.TempFolder)
+        self.Plugin.LogInfo("Setting DEADLINE_JOB_TEMP_FOLDER to '%s' for this session" % self.TempFolder)
+        self.Plugin.SetProcessEnvironmentVariable("DEADLINE_JOB_TEMP_FOLDER", self.TempFolder)
 
         # Check if we are overriding GPU affinity
         selectedGPUs = self.GetGpuOverrides()
         if len(selectedGPUs) > 0:
             gpus = ",".join(str(gpu) for gpu in selectedGPUs)
             self.Plugin.LogInfo(
-                "This Slave is overriding its GPU affinity, so the following GPUs will be used by Octane/RedShift/V-Ray RT: %s" % gpus)
+                "This Worker is overriding its GPU affinity, so the following GPUs will be used by Octane/RedShift/V-Ray RT: %s" % gpus)
             self.Plugin.SetProcessEnvironmentVariable("DEADLINE_GPU_AFFINITY",
                                                       "#(" + gpus + ")")  # Octane / Redshift (prior to 2.0.91-prod or prior to 2.5.11-beta)
             self.Plugin.SetProcessEnvironmentVariable("REDSHIFT_GPUDEVICES", gpus)  # Redshift (newer env var method)
@@ -2228,24 +2166,24 @@ class MaxController(object):
             self.Plugin.SetProcessEnvironmentVariable("VRAY_OPENCL_PLATFORMS_x64", vrayGpus)  # V-Ray RT
 
     def CopyLightningDlx(self):
-        lightningDir = Path.Combine(self.TempFolder, "lightning")
-        if (not Directory.Exists(lightningDir)):
+        lightningDir = os.path.join(self.TempFolder, "lightning")
+        if (not os.path.isdir(lightningDir)):
             Directory.CreateDirectory(lightningDir)
 
-        newLightningPluginFile = Path.Combine(lightningDir, "lightning.dlx")
+        newLightningPluginFile = os.path.join(lightningDir, "lightning.dlx")
         self.Plugin.LogInfo("Copying %s to %s" % (self.LightningPluginFile, newLightningPluginFile))
 
-        if (File.Exists(newLightningPluginFile)):
+        if (os.path.isfile(newLightningPluginFile)):
             try:
-                File.Delete(newLightningPluginFile)
-                File.Copy(self.LightningPluginFile, newLightningPluginFile, False)
+                os.remove(newLightningPluginFile)
+                shutil.copy2(self.LightningPluginFile, newLightningPluginFile)
             except:
                 self.Plugin.LogWarning(
                     "Could not delete old %s - this file may be locked by another copy of 3dsmax" % newLightningPluginFile)
         else:
-            File.Copy(self.LightningPluginFile, newLightningPluginFile, False)
+            shutil.copy2(self.LightningPluginFile, newLightningPluginFile)
 
-        if (not File.Exists(newLightningPluginFile)):
+        if (not os.path.isfile(newLightningPluginFile)):
             self.Plugin.FailRender("Could not copy %s to %s" % (self.LightningPluginFile, newLightningPluginFile))
 
         return lightningDir
@@ -2256,16 +2194,16 @@ class MaxController(object):
             folder = RepositoryUtils.CheckPathMapping(folder).replace("/", "\\")
             if not os.path.isdir(folder):
                 try:
-                    self.Plugin.LogInfo('Creating the output directory "%s"...' % folder)
+                    self.Plugin.LogInfo('Creating the output directory "%s"' % folder)
                     os.makedirs(folder)
                 except:
-                    self.Plugin.LogWarning(
+                    self.Plugin.FailRender(
                         'Failed to create output directory "%s". The path may be invalid or permissions may not be sufficient.' % folder)
 
     def CreatePluginInis(self, lightningDir):
         self.DeletePluginInis()
 
-        self.TempLightningIni = Path.Combine(PathUtils.GetSystemTempPath(),
+        self.TempLightningIni = os.path.join(PathUtils.GetSystemTempPath(),
                                              "lightningplugin_" + self.AuthentificationToken + ".ini")
         writer = File.CreateText(self.TempLightningIni)
         writer.WriteLine("[Directories]")
@@ -2273,15 +2211,15 @@ class MaxController(object):
         writer.Close()
 
         # Long paths tend to cause Max 2008 (32 bit) to crash on 64 bit OS - no idea why...
-        self.TempPluginIni = Path.Combine(PathUtils.ToShortPathName(PathUtils.GetSystemTempPath()),
+        self.TempPluginIni = os.path.join(PathUtils.ToShortPathName(PathUtils.GetSystemTempPath()),
                                           "dl_" + self.AuthentificationToken + ".ini")
-        if File.Exists(self.TempPluginIni):
-            File.Delete(self.TempPluginIni)
+        if os.path.isfile(self.TempPluginIni):
+            os.remove(self.TempPluginIni)
 
         writer = File.CreateText(self.TempPluginIni)
         writer.WriteLine("[Include]")
         writer.WriteLine("Original=%s" % self.MaxPluginIni)
-        if (self.UserPluginIni != "" and File.Exists(self.UserPluginIni)):
+        if (self.UserPluginIni != "" and os.path.isfile(self.UserPluginIni)):
             writer.WriteLine("UserProfile=%s" % self.UserPluginIni)
         writer.WriteLine("Deadline Lightning=%s" % self.TempLightningIni)
         writer.Close()
@@ -2291,50 +2229,11 @@ class MaxController(object):
 
         return self.TempPluginIni
 
-    ##  add by  xbl   2021-0107  CreateFrameInis  json2ini
-    # This to get Current Frame and output --20201113
-    def CreateFrameInis(self, frame):
-        ##'''
-        ##20201113
-        ##by duzhaoji
-        ##get Current Frame and output
-        ###UserTemp/frame.ini
-        ##'''
-        # Long paths tend to cause Max 2008 (32 bit) to crash on 64 bit OS - no idea why...
-
-        self.TempFrameIni = os.path.join(PathUtils.ToShortPathName(PathUtils.GetSystemTempPath()), "frame.ini")
-        if os.path.isfile(self.TempFrameIni):
-            os.remove(self.TempFrameIni)
-        temp_frame = str(frame).zfill(4)
-        writer = File.CreateText(self.TempFrameIni)
-        writer.WriteLine("[frame]")
-        writer.WriteLine("CurrentFrame=%s" % temp_frame)
-        writer.Close()
-
-        return self.TempFrameIni
-
-    def json2ini(self, jobinfo_path, ini_path):
-        if os.path.isfile(ini_path):
-            os.remove(ini_path)
-        inifile = File.CreateText(ini_path)
-        with open(jobinfo_path, 'r') as f1:
-            dic = json.load(f1)
-        if 'bitmapio_params' in dic:
-            bmp = dic['bitmapio_params']
-            for key in bmp:
-                bitmap_dic = key
-            for section, section_items in zip(bitmap_dic.keys(), bitmap_dic.values()):
-                inifile.WriteLine("[" + section + "]\r\n")
-                bb = zip(section_items, section_items.values())
-                for s, v in bb:
-                    inifile.WriteLine("%s=%s" % (s, v) + "\r\n")
-        inifile.Close()
-
     def DeletePluginInis(self):
         if (self.TempPluginIni != ""):
-            if (File.Exists(self.TempPluginIni)):
+            if (os.path.isfile(self.TempPluginIni)):
                 try:
-                    File.Delete(self.TempPluginIni)
+                    os.remove(self.TempPluginIni)
                     self.TempPluginIni = ""
                 except:
                     self.Plugin.LogWarning("Could not delete temp plugin ini: %s" % self.TempPluginIni)
@@ -2342,9 +2241,9 @@ class MaxController(object):
                 self.TempPluginIni = ""
 
         if (self.TempLightningIni != ""):
-            if (File.Exists(self.TempLightningIni)):
+            if (os.path.isfile(self.TempLightningIni)):
                 try:
-                    File.Delete(self.TempLightningIni)
+                    os.remove(self.TempLightningIni)
                     self.TempLightningIni = ""
                 except:
                     self.Plugin.LogWarning("Could not delete temp lightning ini: %s" % self.TempLightningIni)
@@ -2353,9 +2252,9 @@ class MaxController(object):
 
     def DeleteStartupKillScript(self):
         if (self.StartupKillScript != ""):
-            if (File.Exists(self.StartupKillScript)):
+            if (os.path.isfile(self.StartupKillScript)):
                 try:
-                    File.Delete(self.StartupKillScript)
+                    os.remove(self.StartupKillScript)
                 except:
                     self.Plugin.LogWarning("Could not delete kill adsk comm center script: %s" % self.StartupKillScript)
 
@@ -2382,7 +2281,7 @@ class MaxController(object):
                 if (blockingDialogMessage != ""):
                     self.Plugin.FailRender(blockingDialogMessage)
 
-                # ~ if( File.Exists( self.ErrorMessageFile ) ):
+                # ~ if( os.path.isfile( self.ErrorMessageFile ) ):
                 # ~ reader = File.OpenText( self.ErrorMessageFile )
                 # ~ message = reader.ReadToEnd()
                 # ~ reader.Close
@@ -2443,11 +2342,10 @@ class MaxController(object):
         self.Plugin.LogInfo("Loading 3dsmax scene file")
         message = "StartJob,\"" + self.MaxFilename.replace("\\", "/") + "\",\"" + self.Camera + "\""
         self.MaxSocket.Send(message)
-        # self.Plugin.LogInfo( "Loading..." )
+
         startTime = DateTime.Now
         response = ""
 
-        self.Plugin.LogInfo("Loading 3dsmax scene file StartJobTimeout : " + str(self.StartJobTimeout))
         while (DateTime.Now.Subtract(
                 startTime).TotalSeconds < self.StartJobTimeout and response == "" and not self.Plugin.IsCanceled()):
             self.Plugin.VerifyMonitoredManagedProcess(self.ProgramName)
@@ -2459,7 +2357,7 @@ class MaxController(object):
 
             try:
                 response = self.MaxSocket.Receive(100)
-                # self.Plugin.LogWarning( response )
+
                 # If this is a STDOUT message, print it out and reset 'response' so that we keep looping
                 match = self.StdoutRegex.Match(response)
                 if (match.Success):
@@ -2510,53 +2408,13 @@ class MaxController(object):
         # Execute the customizations script if it exists. Note that this needs to be done before the
         # post-load settings below because customize.ms sets the output image size, and some settings
         # (like RegionRendering) need to be set AFTER the output image size is set.
-        customizationScript = Path.Combine(get_local_script_path(), "customize.ms")
-        if (File.Exists(customizationScript)):
+        customizationScript = os.path.join(self.Plugin.GetPluginDirectory(), "customize.ms")
+        if (os.path.isfile(customizationScript)):
             self.ExecuteMaxScriptFile(customizationScript, timeout=self.RunCustomizeScriptTimeout)
-
-        dd = self.Plugin.GetJob()
-
-        try:
-            self.jobinfo_path = dd.GetJobExtraInfoKeyValueWithDefault("info_cfg_file", "").strip().strip("\"")
-            self.ini_path = os.path.join(PathUtils.ToShortPathName(PathUtils.GetSystemTempPath()), "bitmapio.ini")
-            if os.path.exists(self.jobinfo_path):
-                self.json2ini(self.jobinfo_path, self.ini_path)
-                self.Plugin.LogInfo("Execute json2ini over")
-            if os.path.exists(self.ini_path):
-                self.bitmapIOScript = Path.Combine(get_local_script_path(), "bitmapIO.ms")
-                if os.path.exists(self.bitmapIOScript):
-                    self.ExecuteMaxScriptFile(self.bitmapIOScript)
-                    self.Plugin.LogInfo("Execute bitmapIO Script over")
-        except:
-            self.Plugin.LogInfo("info_cfg_file Error")
-
-        try:
-            self.CustomScriptFile = dd.GetJobExtraInfoKeyValueWithDefault("custom_script", "").strip().strip("\"")
-
-            if not os.path.exists(self.CustomScriptFile):
-                self.infoPath = dd.GetJobExtraInfoKeyValueWithDefault("info_cfg_file", "").strip().strip("\"")
-                self.CustomScriptFile = os.path.abspath(os.path.join(os.path.dirname(self.infoPath), "..", "custom.ms"))
-
-            if os.path.exists(self.CustomScriptFile):
-                try:
-                    self.ExecuteMaxScriptFile(self.CustomScriptFile)
-                    self.Plugin.LogInfo("Execute CustomScriptFile over: " + self.CustomScriptFile)
-                except Exception as e:
-                    self.Plugin.LogInfo("Error: execute CustomScriptFile error:" + repr(e))
-
-        except:
-            self.CustomScriptFile = ""
-
-        # PicTypeScript = Path.Combine( get_local_script_path(), "PicType.ms" )
-        # if( File.Exists( PicTypeScript ) ):
-        #    try:
-        #        self.ExecuteMaxScriptFile( PicTypeScript)
-        #    except:
-        #        self.Plugin.LogInfo ("PicTypeScript error")
 
         # Set some post-load settings.
         self.MaxSocket.Send("SlaveFolders,\"" + self.Plugin.GetJobsDataDirectory().replace("\\",
-                                                                                           "/") + "\",\"" + get_local_script_path().replace(
+                                                                                           "/") + "\",\"" + self.Plugin.GetPluginDirectory().replace(
             "\\", "/") + "\"")
         self.MaxSocket.Send("TempFolder,\"" + self.TempFolder.replace("\\", "/") + "\"")
 
@@ -2743,22 +2601,8 @@ class MaxController(object):
             self.ExecuteMaxScriptFile(self.MaxScriptJobScript, frameNumber=self.CurrentFrame)
         else:
             # First run the pre frame script if necessary.
-
             if (self.PreFrameScript != ""):
                 self.ExecuteMaxScriptFile(self.PreFrameScript)
-
-            ## add by xbl  2021-0107
-            self.CreateFrameInis(self.CurrentFrame)
-            self.Plugin.LogInfo("Final--Create inifile for Current Render Frame")
-            self.SliderframeScript = Path.Combine(get_local_script_path(), "sliderframe.ms")
-            self.Plugin.LogInfo("SliderframeScript = %s" % self.SliderframeScript)
-            if os.path.exists(self.SliderframeScript):
-                try:
-                    self.ExecuteMaxScriptFile(self.SliderframeScript)
-                except:
-                    self.Plugin.LogInfo("error")
-
-            ## end of add  ---------------------------------------------------------
 
             # Now tell LIGHTNING to RENDER this FRAME NOW.
             message = "RenderTask," + str(frameNumber)
@@ -2795,16 +2639,16 @@ class MaxController(object):
                             destinationFolder = RepositoryUtils.CheckPathMapping(outputFolders[component]).replace("/",
                                                                                                                    "\\")
                             self.Plugin.LogInfo(
-                                "Searching local output folder for: " + Path.Combine(self.TempFolder, replacedFileName))
-                            if File.Exists(Path.Combine(self.TempFolder, replacedFileName)):
-                                self.Plugin.LogInfo("Found " + Path.Combine(self.TempFolder,
-                                                                            replacedFileName) + " copying to " + Path.Combine(
+                                "Searching local output folder for: " + os.path.join(self.TempFolder, replacedFileName))
+                            if os.path.isfile(os.path.join(self.TempFolder, replacedFileName)):
+                                self.Plugin.LogInfo("Found " + os.path.join(self.TempFolder,
+                                                                            replacedFileName) + " copying to " + os.path.join(
                                     destinationFolder, replacedFileName))
-                                self.Plugin.VerifyAndMoveFile(Path.Combine(self.TempFolder, replacedFileName),
-                                                              Path.Combine(destinationFolder, replacedFileName), -1)
+                                self.Plugin.VerifyAndMoveFile(os.path.join(self.TempFolder, replacedFileName),
+                                                              os.path.join(destinationFolder, replacedFileName), -1)
                             else:
                                 self.Plugin.LogWarning(
-                                    "Unable to locate local render file: " + Path.Combine(self.TempFolder,
+                                    "Unable to locate local render file: " + os.path.join(self.TempFolder,
                                                                                           replacedFileName))
                 else:
                     outputFileNames = self.Plugin.GetJob().OutputFileNames
@@ -2813,16 +2657,16 @@ class MaxController(object):
                         replacedFileName = FrameUtils.ReplacePaddingWithFrameNumber(fileName, frameNumber)
                         destinationFolder = RepositoryUtils.CheckPathMapping(outputFolders[i]).replace("/", "\\")
                         self.Plugin.LogInfo(
-                            "Searching local output folder for: " + Path.Combine(self.TempFolder, replacedFileName))
-                        if File.Exists(Path.Combine(self.TempFolder, replacedFileName)):
-                            self.Plugin.LogInfo("Found " + Path.Combine(self.TempFolder,
-                                                                        replacedFileName) + " copying to " + Path.Combine(
+                            "Searching local output folder for: " + os.path.join(self.TempFolder, replacedFileName))
+                        if os.path.isfile(os.path.join(self.TempFolder, replacedFileName)):
+                            self.Plugin.LogInfo("Found " + os.path.join(self.TempFolder,
+                                                                        replacedFileName) + " copying to " + os.path.join(
                                 destinationFolder, replacedFileName))
-                            self.Plugin.VerifyAndMoveFile(Path.Combine(self.TempFolder, replacedFileName),
-                                                          Path.Combine(destinationFolder, replacedFileName), -1)
+                            self.Plugin.VerifyAndMoveFile(os.path.join(self.TempFolder, replacedFileName),
+                                                          os.path.join(destinationFolder, replacedFileName), -1)
                         else:
                             self.Plugin.LogWarning(
-                                "Unable to locate local render file: " + Path.Combine(self.TempFolder,
+                                "Unable to locate local render file: " + os.path.join(self.TempFolder,
                                                                                       replacedFileName))
 
             if ((VraySplitBufferFile or VrayRawBufferFile) and self.RegionPadding > 0):
@@ -2833,20 +2677,20 @@ class MaxController(object):
                 regTop = min(self.RegionPadding, height - self.RegionBottom)
                 regBottom = self.RegionBottom - self.RegionTop + regTop
 
-                draftLocalPath = Path.Combine(self.slaveDirectory, "Draft")
+                draftLocalPath = os.path.join(self.slaveDirectory, "Draft")
                 draftRepoPath = RepositoryUtils.GetRepositoryPath("draft", False)
-                if not os.path.exists(draftRepoPath):
+                if not os.path.isdir(draftRepoPath):
                     self.Plugin.FailRender("ERROR: Draft was not found in the Deadline Repository!")
 
-                draftRepoPath = Path.Combine(draftRepoPath, "Windows")
+                draftRepoPath = os.path.join(draftRepoPath, "Windows")
 
                 if SystemUtils.Is64Bit():
-                    draftRepoPath = Path.Combine(draftRepoPath, "64bit")
+                    draftRepoPath = os.path.join(draftRepoPath, "64bit")
                 else:
-                    draftRepoPath = Path.Combine(draftRepoPath, "32bit")
+                    draftRepoPath = os.path.join(draftRepoPath, "32bit")
 
                 self.DraftAutoUpdate(draftLocalPath, draftRepoPath)
-                draftLibrary = Path.Combine(draftLocalPath, "Draft.pyd")
+                draftLibrary = os.path.join(draftLocalPath, "Draft.pyd")
 
                 if not os.path.isfile(draftLibrary):
                     self.Plugin.FailRender("Could not find local Draft installation.")
@@ -2864,8 +2708,9 @@ class MaxController(object):
                     if splitChannelName == "" or splitChannelType == "":
                         break
 
-                    tempFile = Path.Combine(self.TempFolder, "cropVrayImage.py")
+                    tempFile = os.path.join(self.TempFolder, "cropVraySplitImage.py")
                     with open(tempFile, "w") as text_file:
+                        text_file.write("from __future__ import print_function\n")
                         text_file.write("import sys\n")
                         text_file.write("sys.path.append(sys.argv[1])\n")
                         text_file.write("import Draft\n")
@@ -2900,14 +2745,13 @@ class MaxController(object):
                             suffix += splitChannelType
 
                         fileName = fileName + "." + splitChannelName + "." + paddedFrame + fileExtension
-                        fullFile = Path.Combine(filePath, suffix, fileName).replace("\\", "\\\\")
-
-                        text_file.write("image = Draft.Image.ReadFromFile( \"%s\" )\n" % fullFile)
+                        fullFile = os.path.join(filePath, suffix, fileName).replace("\\", "\\\\")
+                        text_file.write("image = Draft.Image.ReadFromFile( %s )\n" % repr(fullFile))
                         text_file.write("image.Crop(%i,%i,%i,%i)\n" % (regLeft, regTop, regRight, regBottom))
-                        text_file.write("image.WriteToFile( \"%s\" )\n" % fullFile)
-                        text_file.write("print \"Split VFB File: %s\"\n" % fullFile)
+                        text_file.write("image.WriteToFile( %s )\n" % repr(fullFile))
+                        text_file.write("print(\"Split VFB File: %s\")" % repr(fullFile))
 
-                    pythonPath = Path.Combine(ClientUtils.GetBinDirectory(), "dpython.exe")
+                    pythonPath = os.path.join(ClientUtils.GetBinDirectory(), "dpython.exe")
 
                     self.Plugin.LogInfo("Using Draft to crop V-Ray split buffer file...")
 
@@ -2918,17 +2762,23 @@ class MaxController(object):
 
                     proc = subprocess.Popen([pythonPath, tempFile, self.DraftDirectory], startupinfo=startupinfo,
                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    stdout = proc.stdout.read()
-                    stderr = proc.stderr.read()
+                    stdout, stderr = proc.communicate()
 
-                    self.Plugin.LogInfo("STDOUT: " + stdout)
+                    output = stdout.strip()
+                    outputLines = output.splitlines()
+
+                    for line in outputLines:
+                        self.Plugin.LogStdout(line)
+
                     if len(stderr) > 0:
-                        self.Plugin.LogWarning("STDERR: " + stderr)
+                        self.Plugin.LogWarning(stderr)
+
                     splitCount += 1
 
             if (VrayRawBufferFile and self.RegionPadding > 0):
-                tempFile = Path.Combine(self.TempFolder, "cropVrayImage.py")
+                tempFile = os.path.join(self.TempFolder, "cropVrayRawImage.py")
                 with open(tempFile, "w") as text_file:
+                    text_file.write("from __future__ import print_function\n")
                     text_file.write("import sys\n")
                     text_file.write("sys.path.append(sys.argv[1])\n")
                     text_file.write("import Draft\n")
@@ -2946,12 +2796,12 @@ class MaxController(object):
                     paddedFrame = paddedFrame.zfill(4)
 
                     fullFile = fileName + paddedFrame + fileExtension
-                    text_file.write("image = Draft.Image.ReadFromFile( \"%s\" )\n" % fullFile)
+                    text_file.write("image = Draft.Image.ReadFromFile( %s )\n" % repr(fullFile))
                     text_file.write("image.Crop(%i,%i,%i,%i)\n" % (regLeft, regTop, regRight, regBottom))
-                    text_file.write("image.WriteToFile( \"%s\" )\n" % fullFile)
-                    text_file.write("print \"Raw VFB File: %s\"\n" % fullFile)
+                    text_file.write("image.WriteToFile( %s )\n" % repr(fullFile))
+                    text_file.write("print(\"Raw VFB File: %s\")" % repr(fullFile))
 
-                pythonPath = Path.Combine(ClientUtils.GetBinDirectory(), "dpython.exe")
+                pythonPath = os.path.join(ClientUtils.GetBinDirectory(), "dpython.exe")
 
                 self.Plugin.LogInfo("Using Draft to crop V-Ray raw buffer file...")
 
@@ -2962,60 +2812,64 @@ class MaxController(object):
 
                 proc = subprocess.Popen([pythonPath, tempFile, self.DraftDirectory], startupinfo=startupinfo,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout = proc.stdout.read()
-                stderr = proc.stderr.read()
+                stdout, stderr = proc.communicate()
 
-                self.Plugin.LogInfo("STDOUT: " + stdout)
+                output = stdout.strip()
+                outputLines = output.splitlines()
+
+                for line in outputLines:
+                    self.Plugin.LogStdout(line)
+
                 if len(stderr) > 0:
-                    self.Plugin.LogWarning("STDERR: " + stderr)
+                    self.Plugin.LogWarning(stderr)
 
             # Now run the post frame script if necessary.
             if (self.PostFrameScript != ""):
                 self.ExecuteMaxScriptFile(self.PostFrameScript)
 
-            ddd = self.Plugin.GetJob()
-            custom_post = ddd.GetJobExtraInfoKeyValueWithDefault("PostFrameScript", "").strip().strip("\"")
-            if os.path.exists(custom_post):
-                try:
-                    self.ExecuteMaxScriptFile(custom_post)
-                except:
-                    self.Plugin.LogInfo("error")
-
     def SetVraySplitBufferFile(self, filePath):
         # If rendering locally, then redirect vray split channel render to local directory.
         if self.LocalRendering:
-            splitName = Path.GetFileName(filePath)
-            filePath = Path.Combine(self.TempFolder, splitName)
+            splitName = os.path.basename(filePath)
+            filePath = os.path.join(self.TempFolder, splitName)
 
-        path = Path.Combine(self.TempFolder, "setSplitBufferFilename.ms")
+        filePath = filePath.replace("\\", "\\\\")
 
-        with open(path, 'w') as file:
+        path = os.path.join(self.TempFolder, u"setSplitBufferFilename.ms")
+
+        with io.open(path, "w", encoding="utf-8-sig") as file:
+            if self.LocalRendering:
+                file.write(u"try(renderers.current.output_separateFolders = false)catch()\n")
             if self.IsVrayRT():
-                file.write("renderers.current.V_Ray_settings.output_splitfilename = \"" + filePath.replace("\\",
-                                                                                                           "\\\\") + "\"\ntrue")
+                file.write(u"renderers.current.V_Ray_settings.output_splitfilename = \"%s\"\n" % filePath)
+                file.write(u"true")
             else:
-                file.write("renderers.current.output_splitfilename = \"" + filePath.replace("\\", "\\\\") + "\"\ntrue")
+                file.write(u"renderers.current.output_splitfilename = \"%s\"\n" % filePath)
+                file.write(u"true")
 
         self.ExecuteMaxScriptFile(path, frameNumber=self.CurrentFrame)
-        self.Plugin.LogInfo("SplitBufferFilename set to: %s" % filePath)
+        self.Plugin.LogInfo("SplitBufferFilename set to: %s" % filePath.replace("\\\\", "\\"))
 
     def SetVrayRawBufferFile(self, filePath):
         # If rendering locally, then redirect vray raw render to local directory.
         if self.LocalRendering:
-            rawName = Path.GetFileName(filePath)
-            filePath = Path.Combine(self.TempFolder, rawName)
+            rawName = os.path.basename(filePath)
+            filePath = os.path.join(self.TempFolder, rawName)
 
-        path = Path.Combine(self.TempFolder, "setRawBufferFilename.ms")
+        filePath = filePath.replace("\\", "\\\\")
 
-        with open(path, 'w') as file:
+        path = os.path.join(self.TempFolder, u"setRawBufferFilename.ms")
+
+        with io.open(path, "w", encoding="utf-8-sig") as file:
             if self.IsVrayRT():
-                file.write("renderers.current.V_Ray_settings.output_rawFileName = \"" + filePath.replace("\\",
-                                                                                                         "\\\\") + "\"\ntrue")
+                file.write(u"renderers.current.V_Ray_settings.output_rawFileName = \"%s\"\n" % filePath)
+                file.write(u"true")
             else:
-                file.write("renderers.current.output_rawFileName = \"" + filePath.replace("\\", "\\\\") + "\"\ntrue")
+                file.write(u"renderers.current.output_rawFileName = \"%s\"\n" % filePath)
+                file.write(u"true")
 
         self.ExecuteMaxScriptFile(path, frameNumber=self.CurrentFrame)
-        self.Plugin.LogInfo("RawBufferFilename set to: %s" % filePath)
+        self.Plugin.LogInfo("RawBufferFilename set to: %s" % filePath.replace("\\\\", "\\"))
 
     def IsVrayRT(self):
         isVrayRt = False
@@ -3025,19 +2879,19 @@ class MaxController(object):
 
     def DraftAutoUpdate(self, localPath, repoPath):
         updateNeeded = True
-        if (os.path.exists(localPath)):
+        if (os.path.isdir(localPath)):
             localHash = self.GetFileMD5Hash(os.path.join(localPath, "Version"))
             repoHash = self.GetFileMD5Hash(os.path.join(repoPath, "Version"))
 
             if (localHash == repoHash):
                 updateNeeded = False
         else:
-            os.mkdir(localPath)
+            os.makedirs(localPath)
 
         if (updateNeeded):
             for filePath in Directory.GetFiles(repoPath):
-                fileName = Path.GetFileName(filePath)
-                File.Copy(filePath, Path.Combine(localPath, fileName), True)
+                fileName = os.path.basename(filePath)
+                shutil.copy2(filePath, os.path.join(localPath, fileName))
 
     def GetFileMD5Hash(self, filename):
         if (os.path.isfile(filename)):
@@ -3059,7 +2913,8 @@ class MaxController(object):
 
         return None
 
-    # ExecuteMaxScriptFile: Runs a MaxScript file on the Slave side.
+        # ExecuteMaxScriptFile: Runs a MaxScript file on the Worker side.
+
     #
     # Optional parameters are:
     #     frameNumber=<int>: If set, 3ds Max changes its current time to the specified frame prior to executing the MaxScript file.
@@ -3117,63 +2972,6 @@ class MaxController(object):
 
         return returnedMessage  # Returns an empty string on success, or the resulting string if "returnAsString" is requested.
 
-    def ExecuteMaxScriptFile2(self, maxscriptFilename, **keywordArgs):
-
-        if (not self.Plugin.MonitoredManagedProcessIsRunning(self.ProgramName)):
-            self.Plugin.FailRender("3dsmax exited unexpectedly before being told to execute a script")
-
-        # Grab the parameters from the keyword arguments.
-        useFrameNumber = False
-        frameNumberOverride = 0
-        if "frameNumber" in keywordArgs:
-            useFrameNumber = True
-            frameNumberOverride = keywordArgs["frameNumber"]
-
-        useTimeout = False
-        timeout = -1
-        if "timeout" in keywordArgs:
-            useTimeout = True
-            timeout = keywordArgs["timeout"]
-
-        returnAsString = False
-        if "returnAsString" in keywordArgs:
-            returnAsString = keywordArgs["returnAsString"]
-
-        # Tell Lightning to execute this script.
-        self.Plugin.LogInfo("Executing script: %s" % maxscriptFilename)
-
-        # Arguments Lightning is expecting are: [MaxScript filename] [Set current frame?] [Current frame (ignored if 'set current frame' is false)] [Return as string?]
-        requestMessage = "ExecuteMaxScriptFile," + maxscriptFilename.replace("\\", "/") + "," + str(
-            useFrameNumber) + "," + str(frameNumberOverride) + "," + str(returnAsString)
-        self.MaxSocket.Send(requestMessage)
-
-        # response = ""
-        # try:
-        #     response = self.MaxSocket.Receive( 10000 )
-        # except SimpleSocketTimeoutException:
-        #     self.Plugin.FailRender( "ExecuteMaxScriptFile: Timed out waiting for the lightning 3dsmax plugin to acknowledge the ExecuteMaxScriptFile command.\n%s" % self.NetworkLogGet() )
-
-        # if( not response.startswith( "STARTED" ) ):
-        #     self.Plugin.FailRender( "ExecuteMaxScriptFile: Did not receive a started message in response to ExecuteMaxScriptFile - got \"%s\"\n%s" % (response, self.NetworkLogGet()) )
-
-        # Wait for the script to complete.
-        # This function will raise an exception if a response starting with "Error" is returned.
-        # returnedMessage = self.PollUntilComplete( useTimeout, timeout )
-
-        # return returnedMessage # Returns an empty string on success, or the resulting string if "returnAsString" is requested.
-
-    def get_files(self):
-        file_dir = r"C:\share\maxOutput"
-        L = []
-        for dir_path, dir_names, filenames in os.walk(file_dir):
-            for f in filenames:
-                L.append(os.path.join(dir_path, f))
-        if len(L) > 0:
-            return True
-        else:
-            return False
-
-
     def PollUntilComplete(self, timeoutEnabled, timeoutOverride=-1):
         startTime = DateTime.Now
         progressTimeout = (self.ProgressUpdateTimeout if timeoutOverride < 0 else timeoutOverride)
@@ -3222,7 +3020,7 @@ class MaxController(object):
                                     # Update the V-Ray cfg file on the master machine.
                                     if self.Plugin.VrayDBRJob:
                                         self.UpdateVrayDBRConfigFile(machines, self.DBRConfigFile)
-                                    else:
+                                    elif self.Plugin.VrayRtDBRJob:
                                         self.UpdateVrayRtDBRConfigFile(machines, self.DBRConfigFile)
 
                                     self.DBRMachines = machines
@@ -3273,10 +3071,7 @@ class MaxController(object):
                 elif (isinstance(e, SimpleSocketException)):
                     self.Plugin.FailRender("RenderTask: 3dsmax may have crashed (%s)" % e.Message)
                 else:
-                    if self.get_files():
-                        return ""
-                    else:
-                        self.Plugin.FailRender("RenderTask: Unexpected exception (%s)" % e.Message)
+                    self.Plugin.FailRender("RenderTask: Unexpected exception (%s)" % e.Message)
 
         if (self.Plugin.IsCanceled()):
             self.Plugin.FailRender("Render was canceled")
@@ -3439,32 +3234,7 @@ class MaxProcess(ManagedProcess):
         self.AddStdoutHandlerCallback(
             ".*FumeFX: Estimated Time: ([0-9]+:[0-9]+:[0-9]+)").HandleCallback += self.HandleFumeFXProgress  # 0: STDOUT: "FumeFX: Estimated Time: 00:00:18"
 
-        # If one CPU per task, or overriding CPU affinity, we need to set this V-Ray environment variable, otherwise it uses all cores
-        if self.MaxController.Plugin.GetBooleanPluginInfoEntryWithDefault("OneCpuPerTask",
-                                                                          False) or self.MaxController.Plugin.OverrideCpuAffinity():
-            self.MaxController.Plugin.LogInfo("Setting VRAY_USE_THREAD_AFFINITY to 0 to ensure CPU Affinity works.")
-            self.SetEnvironmentVariable("VRAY_USE_THREAD_AFFINITY", "0")
-
-        # Set the affinity to the current thread number if rendering on one cpu per task
-        if self.MaxController.Plugin.GetBooleanPluginInfoEntryWithDefault("OneCpuPerTask", False):
-            if self.MaxController.Plugin.OverrideCpuAffinity():
-                overrideCPUs = self.MaxController.Plugin.CpuAffinity()
-                if len(overrideCPUs) > 0:
-                    index = ((len(overrideCPUs) + self.MaxController.Plugin.GetThreadNumber()) % len(overrideCPUs))
-                    cpu = overrideCPUs[index]
-                    self.MaxController.Plugin.LogWarning(
-                        "The Slave is overriding its CPU affinity. The following CPU will be used: %s." % cpu)
-                else:
-                    self.MaxController.Plugin.FailRender("The Slave does not have affinity for any CPUs.")
-            else:
-                cpuCount = SystemUtils.GetCpuCount()
-                cpu = ((
-                                   cpuCount + self.MaxController.Plugin.GetThreadNumber()) % cpuCount)  # just in case there are more tasks than cpus
-                self.MaxController.Plugin.LogInfo("Using CPU %s for this render." % cpu)
-
-            self.ProcessAffinity = (cpu,)
-        # for Afterfiles
-        self.AddPopupIgnorer(".*AfterFLICS Authorization.*")
+        self.SetupCPUAffinity()
 
         # For Brazil
         self.AddPopupIgnorer(".*Brazil Console.*")
@@ -3509,10 +3279,7 @@ class MaxProcess(ManagedProcess):
 
         # For V-Ray in workstation mode (such as when rendering mental ray)
         self.AddPopupHandler(".*VRay authorization.*", "Cancel")
-        self.AddPopupHandler(".*V-Ray warning.*", "OK;是(Y)")
-        self.AddPopupHandler(".*VFB Confirm.*", "OK;是(Y)")
-
-        self.AddPopupHandler(".*V-Ray feedback.*", "Cancel")
+        self.AddPopupHandler(".*V-Ray warning.*", "OK")
 
         # Error loading file - unsupported save version
         # 3dsMax attempting to open a Max scene file saved with a newer version of 3dsMax
@@ -3638,7 +3405,7 @@ class MaxProcess(ManagedProcess):
         # Handle "An exception occurred when loading DRA" error that can popup
         self.AddPopupHandler(".*Exception.*", "OK")
 
-        # DbxHost Message - causes both 3dsMax and Deadline Slave app to crash out
+        # DbxHost Message - causes both 3dsMax and Deadline Worker app to crash out
         # ObjectDBX has reported a fatal error: Unable to load the Modeler DLLs
         # http://www.the-area.com/forum/autodesk-3ds-max/3ds-max-through-2008/error-upon-startup/
         # http://forums.cgsociety.org/showthread.php?t=835640
@@ -3717,6 +3484,7 @@ class MaxProcess(ManagedProcess):
         self.AddPopupIgnorer("MAXScript .*")  # ENU #JPN #CHS #KOR
         self.AddPopupIgnorer(".* MAXScript")  # FRA #PTB
         self.AddPopupIgnorer("MAXScript-Debugger")  # DEU
+        self.AddPopupIgnorer("MAXScript-Aufzeichnung")
 
         # Craft Camera Tools - [Gather error]
         # Some nodes were found belonging to Craft Director Studio, but they were never claimed.
@@ -3764,16 +3532,15 @@ class MaxProcess(ManagedProcess):
 
         # Handle Corona Error Message dialog
         self.AddPopupIgnorer("Corona Error Message(s)")
-        self.AddPopupIgnorer("Corona Error")
-        self.AddPopupHandler("Corona Error", "OK")
 
         # Ignore 3dsMax State Sets dialog (visible when HandleWindows10Popups=True)
-        self.AddPopupIgnorer("State Sets")
+        self.AddPopupIgnorer("State Sets")  # English
+        self.AddPopupIgnorer(u"Jeux d'\\xe9tats")  # French
+        self.AddPopupIgnorer(u"\\u30b9\\u30c6\\u30fc\\u30c8\\u30bb\\u30c3\\u30c8")  # Japanese
+        self.AddPopupIgnorer(u"\\u72b6\\u6001\\u96c6")  # Chinese
 
         # Handle PNG Plugin - [PNG Library Internal Error]
-        # self.AddPopupHandler("PNG Plugin", "OK;确定")
-        self.AddPopupHandler("PNG Plugin", "OK;确定")
-        self.AddPopupHandler("PNG 插件", "OK;确定")
+        self.AddPopupHandler("PNG Plugin", "OK")
 
         # Ignore Redshift Render View
         self.AddPopupIgnorer("3dsmax")
@@ -3781,15 +3548,8 @@ class MaxProcess(ManagedProcess):
         self.AddPopupIgnorer("Save Multilayer EXR As")
         self.AddPopupIgnorer("Select snapshots folder")
 
-        # others
-        self.AddPopupIgnorer("Render Scene")
-        self.AddPopupIgnorer("Render Setup.*")
-        self.AddPopupIgnorer("V-Ray feedback.*")
-        self.AddPopupIgnorer(".*Unhide All.*")
-        self.AddPopupHandler("Unhandled exception", "忽略(&I)")
-        self.AddPopupIgnorer(".*渲染场景.*")
-        self.AddPopupIgnorer(".*Scripting Listener.*")
-        self.AddPopupHandler("Forest Pack", "OK;确定")
+        # Ignore SiNi Software popup
+        self.AddPopupIgnorer(".*SiNi Software.*")
 
     def RenderExecutable(self):
         return self.MaxController.ManagedMaxProcessRenderExecutable
@@ -3820,6 +3580,55 @@ class MaxProcess(ManagedProcess):
             self.FumeFXEstTime = self.GetRegexMatch(1)
         else:
             pass
+
+    def SetupCPUAffinity(self):
+        """
+        Modifies the plugin CPU affinity to be a subset of the Current CPU affinity based off the number of render threads specified.
+        This also applies some V-Ray Specific settings to force v-ray to respect the cpu affinity in older versions and the number of render threads in current versions.
+        """
+
+        try:
+            # Try to access the old OneCpuPerTask variable first. If it is not set then use the new variable.
+            threads = int(self.MaxController.Plugin.GetBooleanPluginInfoEntry("OneCpuPerTask"))
+        except RenderPluginException:
+            threads = self.MaxController.Plugin.GetIntegerPluginInfoEntryWithDefault("RenderThreads", 0)
+        submittedThreads = bool(threads)
+
+        overrideMessage = ["The following CPU's will be used for this render:"]
+
+        if self.MaxController.Plugin.OverrideCpuAffinity():
+            overrideMessage.insert(0, "The Worker is overriding its CPU affinity.")
+            availableCPUs = list(self.MaxController.Plugin.CpuAffinity())
+            if not availableCPUs:
+                self.MaxController.Plugin.FailRender("The Worker does not have affinity for any CPUs.")
+
+            if threads == 0 or (threads > 0 and len(availableCPUs) < threads):
+                threads = len(availableCPUs)
+        else:
+            availableCPUs = range(SystemUtils.GetCpuCount())
+
+        if threads:
+            self.MaxController.Plugin.LogInfo("Setting VRAY_USE_THREAD_AFFINITY to 0 to ensure CPU Affinity works.")
+            self.SetEnvironmentVariable("VRAY_USE_THREAD_AFFINITY", "0")
+
+            self.MaxController.Plugin.LogInfo("Setting VRAY_NUM_THREADS environment variable to %s" % threads)
+            self.SetEnvironmentVariable("VRAY_NUM_THREADS", str(threads))
+
+            cpuCount = len(availableCPUs)
+
+            # If the Worker has multiple render threads we want to reduce as much overlap as we can.
+            startIndex = (self.MaxController.Plugin.GetThreadNumber() * threads) % cpuCount
+            endIndex = (startIndex + threads) % cpuCount
+            if startIndex < endIndex:
+                cpus = availableCPUs[startIndex:endIndex]
+            else:
+                # If there are multiple render threads going we could roll over the available CPUs in which case we need to grab from both ends of the available CPUs
+                cpus = availableCPUs[:endIndex] + availableCPUs[startIndex:]
+
+            overrideMessage.append(",".join(str(x) for x in cpus))
+
+            self.MaxController.Plugin.LogWarning(" ".join(overrideMessage))
+            self.ProcessAffinity = cpus
 
 
 ######################################################################
@@ -3859,7 +3668,6 @@ class VRaySpawnerProcess(ManagedProcess):
         self.AddPopupIgnorer("MAXScript .*")  # ENU #JPN #CHS #KOR
         self.AddPopupIgnorer(".* MAXScript")  # FRA #PTB
         self.AddPopupIgnorer("MAXScript-Debugger")  # DEU
-        self.AddPopupIgnorer("Unhide All")
 
         # Handle Corona VFB Saving Options
         self.AddPopupIgnorer(".*Save Image.*")
@@ -3888,9 +3696,8 @@ class VRaySpawnerProcess(ManagedProcess):
             if len(selectedGPUs) > 0:
                 vrayGpus = "index" + ";index".join([str(gpu) for gpu in selectedGPUs])  # "index0;index1"
                 self.Plugin.LogInfo(
-                    "This Slave is overriding its GPU affinity, so the following GPUs will be used by V-Ray RT: %s" % vrayGpus)
+                    "This Worker is overriding its GPU affinity, so the following GPUs will be used by V-Ray RT: %s" % vrayGpus)
                 self.SetEnvironmentVariable("VRAY_OPENCL_PLATFORMS_x64", vrayGpus)  # V-Ray RT
-
 
     def GetVraySpawnerEnvironmet(self, maxVersion):
         """"
@@ -3909,7 +3716,7 @@ class VRaySpawnerProcess(ManagedProcess):
             vr_value = job.GetJobEnvironmentKeyValue("{}".format(vray_key))
             if vr_value:
                 vraySpawnerExepath = "{0}\\vrayspawner{1}.exe".format(vr_value, maxVersion)
-                if os.path.exists(vraySpawnerExepath ) and os.path.isfile( vraySpawnerExepath ):
+                if os.path.exists(vraySpawnerExepath) and os.path.isfile(vraySpawnerExepath):
                     self.Plugin.LogInfo("vraySpawnerExepath = {}".format(vraySpawnerExepath))
                 else:
                     vray_max_root = job.GetJobEnvironmentKeyValue("{}".format("VRAY_FOR_3DSMAX_ROOT"))
@@ -3928,23 +3735,14 @@ class VRaySpawnerProcess(ManagedProcess):
             forceBuild = "none"
 
         # Figure out the render executable to use for rendering.
-        vraySpawnerExecutable = ""
         if self.IsRt:
-            if (forceBuild == "64bit"):
-                exeList = r"C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max " + str(
-                    version) + r" for x64\bin\vrayrtspawner.exe"
-                vraySpawnerExecutable = FileUtils.SearchFileList(exeList)
-            elif (forceBuild == "32bit"):
-                exeList = r"C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max " + str(
-                    version) + r" for x86\bin\vrayrtspawner.exe;C:\Program Files (x86)\Chaos Group\V-Ray\RT for 3ds Max " + str(
-                    version) + r" for x86\bin\vrayrtspawner.exe"
-                vraySpawnerExecutable = FileUtils.SearchFileList(exeList)
-            else:
-                exeList = r"C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max " + str(
-                    version) + r" for x64\bin\vrayrtspawner.exe;C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max " + str(
-                    version) + r" for x86\bin\vrayrtspawner.exe;C:\Program Files (x86)\Chaos Group\V-Ray\RT for 3ds Max " + str(
-                    version) + r" for x86\bin\vrayrtspawner.exe"
-                vraySpawnerExecutable = FileUtils.SearchFileList(exeList)
+            exeList = ";".join([
+                r"C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max %s for x64\bin\vrayrtspawner.exe" % version,
+                r"C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max %s for x86\bin\vrayrtspawner.exe" % version,
+                r"C:\Program Files (x86)\Chaos Group\V-Ray\RT for 3ds Max %s for x86\bin\vrayrtspawner.exe" % version,
+            ])
+
+            vraySpawnerExecutable = FileUtils.SearchFileList(exeList)
 
             if (vraySpawnerExecutable == ""):
                 self.Plugin.FailRender(
@@ -3957,12 +3755,21 @@ class VRaySpawnerProcess(ManagedProcess):
                 prettyName = "3ds Max Design %s" % str(self.Version)
 
             maxRenderExecutable = self.Plugin.GetRenderExecutable(renderExecutableKey, prettyName)
-            self.maxRenderExecutable = maxRenderExecutable   ## for RenderArgument use
+
             self.Plugin.LogInfo(self.Plugin.Prefix + "3ds Max executable: %s" % maxRenderExecutable)
-            # vraySpawnerExecutable = PathUtils.ChangeFilename(maxRenderExecutable, "vrayspawner" + str(version) + ".exe")
+            # vraySpawnerExecutable = PathUtils.ChangeFilename( maxRenderExecutable, "vrayspawner" + str(version) + ".exe" )
+            ###  modify by xubaolong for get vray spawner Executable by plugins libs ###
             vraySpawnerExecutable = self.GetVraySpawnerEnvironmet(version)
-            self.Plugin.LogInfo("vraySpawnerExecutable2 = {}".format(vraySpawnerExecutable ))
-            if not File.Exists(vraySpawnerExecutable):
+            if not os.path.exists(vraySpawnerExecutable):
+                vraySpawnerExecutable = PathUtils.ChangeFilename(maxRenderExecutable,
+                                                                 "vrayspawner" + str(version) + ".exe")
+            if int(version) > 2021:
+                vraySpawnerExecutable = r"C:\ProgramData\Autodesk\ApplicationPlugins\VRay3dsMax{}\bin\vrayspawner{}.exe".format(
+                    version, version)
+            else:
+                vraySpawnerExecutable = r"C:\Program Files\Autodesk\3ds Max {}\vrayspawner{}.exe".format(version,
+                                                                                                         version)
+            if not os.path.isfile(vraySpawnerExecutable):
                 self.Plugin.FailRender(
                     self.Plugin.Prefix + "V-Ray Spawner executable does not exist: " + vraySpawnerExecutable)
 
@@ -4012,20 +3819,14 @@ class VRaySpawnerProcess(ManagedProcess):
         return vraySpawnerExecutable
 
     def RenderArgument(self):
-        self.MaxPluginIni = self.Plugin.GetPluginInfoEntryWithDefault("OverridePluginIni", "")
-        if self.MaxPluginIni:
-            vraySpawnerExecutableCMD = ' -AppName="{}" -cmdparams="-p {}"'.format(self.maxRenderExecutable,
-                                                                                  self.MaxPluginIni)
-            return vraySpawnerExecutableCMD
-        else:
-            return ""
+        return ""
 
 
+######################################################################
+## This is the class that starts up the Corona DRServer process.
+######################################################################
 class CoronaDRProcess(ManagedProcess):
-    """This is the class that starts up the Corona DRServer process."""
-
     def __init__(self, plugin):
-        # type: (MaxPlugin) -> None
         self.Plugin = plugin
         self.TempFolder = self.Plugin.CreateTempDirectory(str(self.Plugin.GetThreadNumber()))
         self.Plugin.LogInfo("Temp folder: " + self.TempFolder)
@@ -4035,7 +3836,6 @@ class CoronaDRProcess(ManagedProcess):
         self.RenderExecutableCallback += self.RenderExecutable
 
     def Cleanup(self):
-        # type: () -> None
         for stdoutHandler in self.StdoutHandlers:
             del stdoutHandler.HandleCallback
 
@@ -4044,7 +3844,6 @@ class CoronaDRProcess(ManagedProcess):
         del self.RenderExecutableCallback
 
     def InitializeProcess(self):
-        # type: () -> None
         # Set the process specific settings.
         self.ProcessPriority = ProcessPriorityClass.BelowNormal
         self.UseProcessTree = True
@@ -4089,19 +3888,18 @@ class CoronaDRProcess(ManagedProcess):
         job = self.Plugin.GetJob()
         coronaSpawnerExepath = ""
 
-        coronaSpawnerExepath = job.GetJobEnvironmentKeyValue("CORONA_DR_EXECUTE_PATH")
-        if not os.path.exists(coronaSpawnerExepath ):
-            self.Plugin.FailRender("Not get Corona DR executepath by the environment sets ! ")
+        coronaSpawnerExepath = job.GetJobEnvironmentKeyValue("CORONA_DR_EXECUTABLE_PATH")
         return coronaSpawnerExepath
 
     def RenderExecutable(self):
-        # type: () -> None
         version = self.Plugin.GetIntegerPluginInfoEntry("Version")
-        if version < 2015:
+        if (version < 2015):
             self.Plugin.FailRender(self.Plugin.Prefix + "Only 3dsmax 2015 and later is supported")
 
-        # executable = self.Plugin.GetRenderExecutable("CoronaDrServerExecutable", "Corona DrServer")
+        ###  先查找yaml 配置地址，找不到的使用deadline配置的默认地址找。
         executable = self.GetCoronaSpawnerEnvironmet(version)
+        if not os.path.exists(executable):
+            executable = self.Plugin.GetRenderExecutable("CoronaDrServerExecutable", "Corona DrServer")
 
         self.Plugin.LogInfo("Executable: %s" % executable)
 
@@ -4109,40 +3907,39 @@ class CoronaDRProcess(ManagedProcess):
         self.Plugin.LogInfo("Existing DR Process: %s" % existingDRProcess)
 
         processName = Path.GetFileNameWithoutExtension(executable)
-        if ProcessUtils.IsProcessRunning(processName):
+        if (ProcessUtils.IsProcessRunning(processName)):
             processes = Process.GetProcessesByName(processName)
 
             if len(processes) > 0:
                 self.Plugin.LogWarning("Found existing '%s' process" % processName)
                 process = processes[0]
 
-                if existingDRProcess == "Fail On Existing Process":
-                    if process is not None:
+                if (existingDRProcess == "Fail On Existing Process"):
+                    if process != None:
                         self.Plugin.FailRender(
                             "Fail On Existing Process is enabled, and a process '%s' with pid '%d' exists - shut down this copy of Corona DrServer. Ensure DrServer is NOT already running!" % (
-                                processName, process.Id))
+                            processName, process.Id))
 
-                if existingDRProcess == "Kill On Existing Process":
-                    if ProcessUtils.KillProcesses(processName, 3):
-                        if process is not None:
+                if (existingDRProcess == "Kill On Existing Process"):
+                    if (ProcessUtils.KillProcesses(processName, 3)):
+                        if process != None:
                             self.Plugin.LogInfo("Successfully Killed Corona DrServer process: '%s' with pid: '%d'" % (
-                                processName, process.Id))
+                            processName, process.Id))
 
                         SystemUtils.Sleep(5000)
 
-                        if ProcessUtils.IsProcessRunning(processName):
+                        if (ProcessUtils.IsProcessRunning(processName)):
                             self.Plugin.LogWarning(
                                 "Corona DrServer is still running: '%s' process, perhaps due to it being automatically restarted after the previous kill command. Ensure Corona DrServer is NOT already running!" % processName)
                             process = Process.GetProcessesByName(processName)[0]
-                            if process is not None:
+                            if process != None:
                                 self.Plugin.FailRender(
                                     "Kill On Existing Process is enabled, and a process '%s' with pid '%d' still exists after executing a kill command. Ensure Corona DrServer is NOT already running!" % (
-                                        processName, process.Id))
+                                    processName, process.Id))
 
         return executable
 
     def RenderArgument(self):
-        # type: () -> str
         arguments = ""
 
         drServerNoGui = self.Plugin.GetBooleanConfigEntryWithDefault("CoronaDRServerNoGui", False)
@@ -4150,74 +3947,3 @@ class CoronaDRProcess(ManagedProcess):
             arguments += "--noGui"
 
         return arguments
-
-
-### robocopy
-def robocopy(src, dest, move=True, exe=None):
-    if sys.platform.startswith("win"):
-        if not exe or not os.path.exists(exe):
-            exe = r"c:\Windows\System32\robocopy.exe"
-        cmd = [exe]
-        cmd.append(src)
-        cmd.append(dest)
-        cmd.append("*.*")
-        cmd.append("/E")
-        cmd.append("/MOVE")
-        cmd.append("/COPY:DT")
-        cmd.append("/NODCOPY")
-        cmd.append("/XX")
-        cmd.append("/R:10")
-        cmd.append("/W:5")
-        # cmd.append("/IoRate:30M")
-    else:
-        cmd = ["rsync"]
-        cmd.append("--remove-source-files")
-        cmd.append("-avP")
-        if not src.endswith("/"):
-            cmd.append(src + "/")
-        else:
-            cmd.append(src)
-        cmd.append(dest)
-
-    print(' '.join(cmd))
-    process = subprocess.Popen(
-        cmd, shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-
-    failed = 0
-    for line in process.stdout:
-        process.poll()
-        if sys.platform.startswith('win'):
-            print(line.decode('gbk').rstrip('\n'))
-            if six.PY3:
-                line = line.decode('gbk').strip()
-            else:
-                line = line.decode('gbk').strip().encode('utf-8')
-            # print(line)
-            # print(type(line))
-            if six.PY3:
-                lit_file = six.ensure_str(b'\xe6\x96\x87\xe4\xbb\xb6', 'utf-8')
-            else:
-                lit_file = six.ensure_str(u'\u6587\u4ef6', 'utf-8')
-
-            if line.startswith(lit_file):
-                cols = re.split(r'\s+', line)
-                if len(cols) < 5:
-                    continue
-                print(cols)
-                total = int(cols[1])
-                failed = int(cols[5])
-        else:
-            print(line.decode(sys.getdefaultencoding()).rstrip('\n'))
-
-    process.wait()
-    return failed == 0
-
-
-def robocopy_retry(src, dest, count, interval):
-    for _ in range(1, count):
-        if robocopy(src, dest):
-            return
-        time.sleep(interval)
