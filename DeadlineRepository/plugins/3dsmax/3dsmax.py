@@ -370,7 +370,7 @@ class MaxPlugin(DeadlinePlugin):
 
                 if (os.path.isfile(backupConfigFile)):
                     self.LogInfo(self.Prefix + "Restoring backup config file: %s to original location: %s" % (
-                    backupConfigFile, self.MyMaxController.DBRConfigFile))
+                        backupConfigFile, self.MyMaxController.DBRConfigFile))
                     shutil.copy2(backupConfigFile, self.MyMaxController.DBRConfigFile)
                 else:
                     self.LogWarning(self.Prefix + "Skipping restore of backup config file as it does not exist")
@@ -1265,7 +1265,7 @@ class MaxController(object):
                 process = Process.GetProcessesByName(processName)[0]
                 self.Plugin.FailRender(
                     "FailOnExistingMaxProcess is enabled, and a process %s with pid %d exists - shut down this copy of 3dsmax to enable network rendering on this machine" % (
-                    processName, process.Id))
+                        processName, process.Id))
 
         # Reset where we're at in the 3dsmax network log.
         self.NetworkLogStart()
@@ -1423,7 +1423,7 @@ class MaxController(object):
         # Get the OverrideSaveFile setting.
         if self.Plugin.GetBooleanPluginInfoEntryWithDefault("SaveFile",
                                                             True) == self.Plugin.GetBooleanPluginInfoEntryWithDefault(
-                "SaveFile", False):
+            "SaveFile", False):
             self.OverrideSaveFile = True
             self.SaveFile = self.Plugin.GetBooleanPluginInfoEntry("SaveFile")
             self.Plugin.LogInfo("Overriding save file option: %s" % self.SaveFile)
@@ -1517,7 +1517,7 @@ class MaxController(object):
                 self.BlackPixelThreshold = 1.0
             self.Plugin.LogInfo(
                 "Fail on black frames enabled: black pixel percentage = %d, black pixel threshold = %.4f, check render elements = %s" % (
-                self.BlackPixelPercentage, self.BlackPixelThreshold, self.BlackFramesCheckRenderElements))
+                    self.BlackPixelPercentage, self.BlackPixelThreshold, self.BlackFramesCheckRenderElements))
 
         self.DisableAltOutput = self.Plugin.GetBooleanConfigEntryWithDefault("DisableAltOutput", False)
         if self.DisableAltOutput:
@@ -1571,8 +1571,8 @@ class MaxController(object):
         if (self.RegionRendering):
             self.Plugin.LogInfo(
                 "Region rendering enabled: left = %d, top = %d, right = %d, bottom = %d, padding = %d, type = %s" % (
-                self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom, self.RegionPadding,
-                self.RegionType))
+                    self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom, self.RegionPadding,
+                    self.RegionType))
 
         # Get the PreFrameScript setting.
         self.PreFrameScript = self.Plugin.GetPluginInfoEntryWithDefault("PreFrameScript", "").strip().strip("\"")
@@ -2299,7 +2299,7 @@ class MaxController(object):
             except Exception as e:
                 if (not isinstance(e, SimpleSocketTimeoutException)):
                     self.Plugin.FailRender("%s: Error getting connection from 3dsmax: %s\n%s" % (
-                    errorMessageOperation, e.Message, self.NetworkLogGet()))
+                        errorMessageOperation, e.Message, self.NetworkLogGet()))
 
             if (self.Plugin.IsCanceled()):
                 self.Plugin.FailRender("%s: Initialization was canceled by Deadline" % errorMessageOperation)
@@ -2308,16 +2308,16 @@ class MaxController(object):
             if (DateTime.Now.Subtract(startTime).TotalSeconds < self.LoadMaxTimeout):
                 self.Plugin.FailRender(
                     "%s: Max exited unexpectedly - check that max starts up with no dialog messages\n%s" % (
-                    errorMessageOperation, self.NetworkLogGet()))
+                        errorMessageOperation, self.NetworkLogGet()))
             else:
                 self.Plugin.FailRender(
                     "%s: Timed out waiting for 3ds max to start - consider increasing the LoadMaxTimeout in the 3dsmax plugin configuration (current value is %d seconds).\n%s" % (
-                    errorMessageOperation, self.LoadMaxTimeout, self.NetworkLogGet()))
+                        errorMessageOperation, self.LoadMaxTimeout, self.NetworkLogGet()))
 
         if (receivedToken != self.AuthentificationToken):
             self.Plugin.FailRender(
                 "%s: Did not receive expected token from Lightning plugin (got \"%s\") - an unexpected error may have occurred during initialization\n%s" % (
-                errorMessageOperation, receivedToken, self.NetworkLogGet()))
+                    errorMessageOperation, receivedToken, self.NetworkLogGet()))
 
     def LoadMaxFile(self):
         # Set some pre-loading settings.
@@ -2389,7 +2389,7 @@ class MaxController(object):
 
         if (not response.startswith("SUCCESS")):
             self.Plugin.FailRender("Did not receive a success message in response to StartJob.\nResponse: %s\n%s" % (
-            response, self.NetworkLogGet()))
+                response, self.NetworkLogGet()))
 
         if (len(response) > 7):
             self.Plugin.LogInfo(response[8:])
@@ -2426,7 +2426,8 @@ class MaxController(object):
             self.MaxSocket.Send("HideFrameBuffer")
         if (self.RegionRendering):
             self.MaxSocket.Send("RegionRendering,%d,%d,%d,%d,%d,%s" % (
-            self.RegionPadding, self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom, self.RegionType))
+                self.RegionPadding, self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom,
+                self.RegionType))
         if (self.OverrideSaveFile):
             self.MaxSocket.Send("OverrideSaveFile,%d" % self.SaveFile)
         if (self.RedirectOutput):
@@ -2518,10 +2519,11 @@ class MaxController(object):
 
             self.Plugin.LogInfo(
                 "Region rendering enabled: left = %d, top = %d, right = %d, bottom = %d, padding = %d, type = %s" % (
-                self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom, self.RegionPadding,
-                self.RegionType))
+                    self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom, self.RegionPadding,
+                    self.RegionType))
             self.MaxSocket.Send("RegionRendering,%d,%d,%d,%d,%d,%s" % (
-            self.RegionPadding, self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom, self.RegionType))
+                self.RegionPadding, self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom,
+                self.RegionType))
 
             self.RenderOutputOverride = self.Plugin.GetPluginInfoEntryWithDefault(
                 "RegionFilename" + str(self.RegionRenderingIndex), "").strip()
@@ -2563,8 +2565,8 @@ class MaxController(object):
                 self.RegionRight = self.RegionRightArray[frameVal]
                 self.RegionBottom = self.RegionBottomArray[frameVal]
                 self.MaxSocket.Send("RegionRendering,%d,%d,%d,%d,%d,%s" % (
-                self.RegionPadding, self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom,
-                self.RegionType))
+                    self.RegionPadding, self.RegionLeft, self.RegionTop, self.RegionRight, self.RegionBottom,
+                    self.RegionType))
 
             if VrayRawBufferFile:
                 filePath = self.Plugin.GetPluginInfoEntryWithDefault("RawBufferFilename0", "")
@@ -2623,7 +2625,7 @@ class MaxController(object):
             if (not response.startswith("STARTED")):
                 self.Plugin.FailRender(
                     "RenderFrame: Did not receive a started message in response to RenderTask - got \"%s\"\n%s" % (
-                    response, self.NetworkLogGet()))
+                        response, self.NetworkLogGet()))
 
             # Wait for the render to complete.
             self.PollUntilComplete(not self.DisableProgressUpdateTimeout)
@@ -2964,7 +2966,7 @@ class MaxController(object):
         if (not response.startswith("STARTED")):
             self.Plugin.FailRender(
                 "ExecuteMaxScriptFile: Did not receive a started message in response to ExecuteMaxScriptFile - got \"%s\"\n%s" % (
-                response, self.NetworkLogGet()))
+                    response, self.NetworkLogGet()))
 
         # Wait for the script to complete.
         # This function will raise an exception if a response starting with "Error" is returned.
@@ -2992,7 +2994,7 @@ class MaxController(object):
                 while (TimeSpan.FromTicks(DateTime.Now.Ticks - start).Milliseconds < 500):
 
                     # if V-Ray or V-Ray RT DBR off-load job only.
-                    if self.Plugin.VrayDBRJob or self.Plugin.VrayRtDBRJob:
+                    if self.Plugin.VrayDBRJob or self.Plugin.VrayRtDBRJob or self.Plugin.CoronaDBRJob:
 
                         # Only for master TaskId:0 machine, update the local V-Ray *.cfg file.
                         if int(self.Plugin.GetCurrentTaskId()) == 0:
@@ -3020,6 +3022,8 @@ class MaxController(object):
                                     # Update the V-Ray cfg file on the master machine.
                                     if self.Plugin.VrayDBRJob:
                                         self.UpdateVrayDBRConfigFile(machines, self.DBRConfigFile)
+                                    elif self.Plugin.CoronaDBRJob:
+                                        self.UpdateCoronaConfigFile(machines, self.DBRConfigFile)
                                     elif self.Plugin.VrayRtDBRJob:
                                         self.UpdateVrayRtDBRConfigFile(machines, self.DBRConfigFile)
 
@@ -3063,11 +3067,11 @@ class MaxController(object):
                         if timeoutOverride < 0:
                             self.Plugin.FailRender(
                                 "Timed out waiting for the next progress update. The ProgressUpdateTimeout setting can be modified in the 3dsmax plugin configuration (current value is %d seconds).\n%s" % (
-                                self.ProgressUpdateTimeout, self.NetworkLogGet()))
+                                    self.ProgressUpdateTimeout, self.NetworkLogGet()))
                         else:
                             self.Plugin.FailRender(
                                 "Timed out during script execution. Current value is %d seconds.\n%s" % (
-                                progressTimeout, self.NetworkLogGet()))
+                                    progressTimeout, self.NetworkLogGet()))
                 elif (isinstance(e, SimpleSocketException)):
                     self.Plugin.FailRender("RenderTask: 3dsmax may have crashed (%s)" % e.Message)
                 else:
@@ -3796,14 +3800,14 @@ class VRaySpawnerProcess(ManagedProcess):
                     if process != None:
                         self.Plugin.FailRender(
                             self.Plugin.Prefix + "Fail On Existing Process is enabled, and a process '%s' with pid '%d' exists - shut down this copy of V-Ray Spawner. Ensure V-Ray Spawner is NOT already running! (GUI or Service Mode)" % (
-                            processName, process.Id))
+                                processName, process.Id))
 
                 if (spawnerExistingProcess == "Kill On Existing Process"):
                     if (ProcessUtils.KillProcesses(processName)):
                         if process != None:
                             self.Plugin.LogInfo(
                                 self.Plugin.Prefix + "Successfully killed V-Ray Spawner process: '%s' with pid: '%d'" % (
-                                processName, process.Id))
+                                    processName, process.Id))
 
                         SystemUtils.Sleep(5000)
 
@@ -3814,7 +3818,7 @@ class VRaySpawnerProcess(ManagedProcess):
                             if process != None:
                                 self.Plugin.FailRender(
                                     self.Plugin.Prefix + "Kill On Existing Process is enabled, and a process '%s' with pid '%d' still exists after executing a kill command. Ensure V-Ray Spawner is NOT already running! (GUI or Service Mode)" % (
-                                    processName, process.Id))
+                                        processName, process.Id))
 
         return vraySpawnerExecutable
 
@@ -3878,6 +3882,42 @@ class CoronaDRProcess(ManagedProcess):
 
         self.Plugin.SetProcessEnvironmentVariable("NW_ROOT_PATH", self.TempFolder)
 
+    ## add by xubaolong
+    def createDrConfig(self, version):
+        import platform
+        if not os.path.exists("C:\\Users\\{}\\AppData\\Local\\CoronaRenderer\\DrData".format(os.getlogin())):
+            os.makedirs("C:\\Users\\{}\\AppData\\Local\\CoronaRenderer\\DrData".format(os.getlogin()))
+
+        f = open("C:\\Users\\{}\\AppData\\Local\\CoronaRenderer\\DrData\\DrConfig.txt".format(os.getlogin()), "w")
+        f.write("RetainEXR = false\n")
+        f.write("Default = {}\n".format(version))
+        f.write("SizeLimit = 10737418240\n")
+        f.write("SlaveName = {}\n".format(platform.node()))
+        f.write("RestartMax = false\n")
+        f.close()
+
+    ## Corona DrServer lauch 3dsmaxcmd.exe instead of 3dsmax.exe, so have to copy the plugin.ini to 3dsmax install folder.
+    def CopyPluginInis(self, version):
+        job = self.Plugin.GetJob()
+
+        renderExecutableKey = "RenderExecutable" + str(version)
+        prettyName = "3ds Max %s" % str(version)
+
+        maxRenderExecutable = self.Plugin.GetRenderExecutable(renderExecutableKey, prettyName)
+
+        override_plugin_ini = self.Plugin.GetPluginInfoEntryWithDefault("OverridePluginIni", "")
+        if not os.path.exists(override_plugin_ini):
+            return
+        maxRoot = Path.GetDirectoryName(maxRenderExecutable)
+
+        self.Plugin.LogInfo("maxRoot: {}, plugin ini {}".format(maxRoot, override_plugin_ini))
+
+        if version < 2013:
+            File.Copy(override_plugin_ini, maxRoot)
+        else:
+            File.Copy(override_plugin_ini, Path.Combine(maxRoot, "en-US", "plugin.ini"), True)
+            File.Copy(override_plugin_ini, Path.Combine(maxRoot, "zh-CN", "plugin.ini"), True)
+
     def GetCoronaSpawnerEnvironmet(self, maxVersion):
         """"
         corona 的yaml ，增加 一对KV.用于处理corona DR的调用地址  详细情况可以查看插件库的max2022 corona 8.1
@@ -3888,7 +3928,8 @@ class CoronaDRProcess(ManagedProcess):
         job = self.Plugin.GetJob()
         coronaSpawnerExepath = ""
 
-        coronaSpawnerExepath = job.GetJobEnvironmentKeyValue("CORONA_DR_EXECUTABLE_PATH")
+        coronaDbrPath = job.GetJobEnvironmentKeyValue("CORONA_DRSERVER_PATH")
+        coronaSpawnerExepath = "{}\\DrServer.exe".format(coronaDbrPath)
         return coronaSpawnerExepath
 
     def RenderExecutable(self):
@@ -3905,7 +3946,8 @@ class CoronaDRProcess(ManagedProcess):
 
         existingDRProcess = self.Plugin.GetConfigEntryWithDefault("CoronaExistingDRProcess", "Fail On Existing Process")
         self.Plugin.LogInfo("Existing DR Process: %s" % existingDRProcess)
-
+        self.createDrConfig(version)
+        self.CopyPluginInis(version)
         processName = Path.GetFileNameWithoutExtension(executable)
         if (ProcessUtils.IsProcessRunning(processName)):
             processes = Process.GetProcessesByName(processName)
@@ -3918,13 +3960,13 @@ class CoronaDRProcess(ManagedProcess):
                     if process != None:
                         self.Plugin.FailRender(
                             "Fail On Existing Process is enabled, and a process '%s' with pid '%d' exists - shut down this copy of Corona DrServer. Ensure DrServer is NOT already running!" % (
-                            processName, process.Id))
+                                processName, process.Id))
 
                 if (existingDRProcess == "Kill On Existing Process"):
                     if (ProcessUtils.KillProcesses(processName, 3)):
                         if process != None:
                             self.Plugin.LogInfo("Successfully Killed Corona DrServer process: '%s' with pid: '%d'" % (
-                            processName, process.Id))
+                                processName, process.Id))
 
                         SystemUtils.Sleep(5000)
 
@@ -3935,7 +3977,7 @@ class CoronaDRProcess(ManagedProcess):
                             if process != None:
                                 self.Plugin.FailRender(
                                     "Kill On Existing Process is enabled, and a process '%s' with pid '%d' still exists after executing a kill command. Ensure Corona DrServer is NOT already running!" % (
-                                    processName, process.Id))
+                                        processName, process.Id))
 
         return executable
 

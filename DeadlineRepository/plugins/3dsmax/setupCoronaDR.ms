@@ -1,13 +1,14 @@
 try
 (	
+	DeadlineUtil.logMessage( "enable corona dr" )
 	cr = renderers.current
 	cr.dr_enable=true
-	cr.dr_searchDuringRender=false
+	cr.dr_searchDuringRender=true
 	cr.dr_slaveAddresses=#()
 	cr.dr_slaveResolvedNames=#()
 	
 	local coronaConfigFile = systemTools.getEnvVariable( "DEADLINE_CORONA_CONFIG_FILE" )
-	
+	DeadlineUtil.logMessage( "corona dr configfile = "+ (coronaConfigFile) )
 	if coronaConfigFile != undefined then
 	(
 		cr = CoronaRenderer.CoronaFp
