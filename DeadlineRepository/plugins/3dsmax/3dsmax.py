@@ -3885,10 +3885,10 @@ class CoronaDRProcess(ManagedProcess):
     ## add by xubaolong
     def createDrConfig(self, version):
         import platform
-        if not os.path.exists("C:\\Users\\{}\\AppData\\Local\\CoronaRenderer\\DrData".format(os.getlogin())):
-            os.makedirs("C:\\Users\\{}\\AppData\\Local\\CoronaRenderer\\DrData".format(os.getlogin()))
+        if not os.path.exists("C:\\Users\\administrator\\AppData\\Local\\CoronaRenderer\\DrData"):
+            os.makedirs("C:\\Users\\administrator\\AppData\\Local\\CoronaRenderer\\DrData")
 
-        f = open("C:\\Users\\{}\\AppData\\Local\\CoronaRenderer\\DrData\\DrConfig.txt".format(os.getlogin()), "w")
+        f = open("C:\\Users\\administrator\\AppData\\Local\\CoronaRenderer\\DrData\\DrConfig.txt", "w")
         f.write("RetainEXR = false\n")
         f.write("Default = {}\n".format(version))
         f.write("SizeLimit = 10737418240\n")
