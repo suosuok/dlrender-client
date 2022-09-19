@@ -3759,7 +3759,7 @@ class VRaySpawnerProcess(ManagedProcess):
                 prettyName = "3ds Max Design %s" % str(self.Version)
 
             maxRenderExecutable = self.Plugin.GetRenderExecutable(renderExecutableKey, prettyName)
-
+            self.maxRenderExecutable =maxRenderExecutable
             self.Plugin.LogInfo(self.Plugin.Prefix + "3ds Max executable: %s" % maxRenderExecutable)
             # vraySpawnerExecutable = PathUtils.ChangeFilename( maxRenderExecutable, "vrayspawner" + str(version) + ".exe" )
             ###  modify by xubaolong for get vray spawner Executable by plugins libs ###
@@ -3823,7 +3823,12 @@ class VRaySpawnerProcess(ManagedProcess):
         return vraySpawnerExecutable
 
     def RenderArgument(self):
-        return ""
+        self.MaxPluginIni = self.Plugin.GetPluginInfoEntryWithDefault("OverridePluginIni", "")
+        if self.MaxPluginIni:
+            vraySpawnerExecutableCMD = ' -AppName="{}" -cmdparams="-p {}"'.format( self.maxRenderExecutable, self.MaxPluginIni)
+            return vraySpawnerExecutableCMD
+        else:
+            return ""
 
 
 ######################################################################
