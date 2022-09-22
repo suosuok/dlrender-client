@@ -445,7 +445,7 @@ function getVrayVersion =
     local setVrayVersion = false
     local vr = renderers.current as string
 
-    if (findstring vr "V_Ray_Next") != undefined or (findstring vr "V_Ray_5") != undefined then (
+    if (findstring vr "V_Ray_Next") != undefined or (findstring vr "V_Ray_5") != undefined  or (findstring vr "V_Ray_6") != undefined then (
         local ver = getVrayNextVersion()
         return #(ver, false)
     )
