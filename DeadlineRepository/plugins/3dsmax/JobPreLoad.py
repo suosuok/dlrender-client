@@ -187,8 +187,6 @@ class MaxPluginsPre:
         CleanProcess().do_it()
 
     def clean_DCC_pluginsfiles(self):
-        # 此处清理系统内残留的插件文件
-        # 此处清理max默认配置文件的ini文件--阻止配置错误导致的max加载异常
         self.deadlinePlugin.LogInfo("clean_DCC_pluginsfiles")
         self.clean_multiscatter_dlos()
         self.clean_vray_files()
@@ -267,12 +265,8 @@ class MaxPluginsPre:
 
     def do_max_prejob_plugins(self, ):
         self.deadlinePlugin.LogInfo("Starting  to do Job Plugins Pre !  ")
-        # 功能:杀掉渲染节点内当前存在的进程,删除干扰下次渲染的残留插件文件
         self.kill_exists_DCC_process()
         self.clean_DCC_pluginsfiles()
-
-        # 功能:服务暂停,文件拷贝,目录拷贝,注册表设置,服务启动
-        # 第一步取出配置文件地址
         try:
             self.pre_job_info_file = self.job.GetJobExtraInfoKeyValue("pre_job")
             self.deadlinePlugin.LogInfo(
@@ -283,7 +277,6 @@ class MaxPluginsPre:
                 u"GetJobExtraInfoKeyValue pre_job_info_file Failed : {}".format(repr(e))
             )
 
-        # 第二步,解析配置文件,将内容生成为字典,并将字典内容另存一份为 last_pre_job.json ,供td以后对任务插件进行查错.
         last_pre_job_filepath = os.path.join(self.sc_tools_home, "last_pre_job.json")
         if not os.path.exists(self.sc_tools_home):
             os.mkdir(self.sc_tools_home)
@@ -348,7 +341,7 @@ class MODIFYINI(object):
         self.config.read(mxp_path, encoding="utf-16")
         asset_path = os.path.dirname(self.scenefile)
         self.deadlinePlugin.LogInfo("asset_path = {}".format(asset_path))
-        self.config.set('BitmapDirs', 'Dir11', asset_path)  # 写入数据
+        self.config.set('BitmapDirs', 'Dir11', asset_path) 
         self.config.write(open(mxp_path, 'w',encoding="utf-16"))
 
 
@@ -358,8 +351,8 @@ def __main__(*args):
     job = deadlinePlugin.GetJob()
     Version = deadlinePlugin.GetPluginInfoEntryWithDefault("Version", None)
     # old 
-    rebuild_mxp = MODIFYINI(deadlinePlugin)
-    rebuild_mxp.write_ini()
+    # rebuild_mxp = MODIFYINI(deadlinePlugin)
+    # rebuild_mxp.write_ini()
     # new 
     MPP = MaxPluginsPre(deadlinePlugin, job, Version)
     MPP.do_max_prejob_plugins()
