@@ -61,7 +61,7 @@ class CleanProcess(object):
 
 class MaxPluginsPre:
 
-    def __init__(self, deadlinePlugin, job, Version) -> None:
+    def __init__(self, deadlinePlugin, job, Version):
         self.deadlinePlugin = deadlinePlugin
         self.job = job
         self.version = Version
