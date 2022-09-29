@@ -6,6 +6,8 @@ global temp_renderoutput = rendOutputFilename
 global changeExtensionFormat = ".tga"
 global DBR_job = False
 global AnimationRender = False
+global UseVray = False 
+global UseCorona = False 
 
 struct du (
 
@@ -32,8 +34,8 @@ if scriptSelfDir.count == 0 then (
         )catch()
     )
 )
-scriptSelfDir += "\\"
 
+scriptSelfDir += "\\"
 myIniFilePath = (scriptSelfDir + "setting.ini")
 myPluginInBuildVersion = getINISetting myIniFilePath "build" "version"
 myAppDataDirName = getINISetting myIniFilePath "clientinfo" "appdatadirname"
@@ -43,7 +45,6 @@ myAppName = getINISetting myIniFilePath "clientinfo" "name"
 if myAppName != undefined or myAppName == "" then (
     myAppName = "FarmClient"
 )
-
 
 function check_CRP_in_startup_scripts =
 (
@@ -1162,7 +1163,7 @@ function addCoronaMtlChannel args =
     try (
         rem.SetElementsActive(true)
         local mtlchannel = getCoronaMtlID()
-        mtlchannel.what = 2
+        mtlchannel.what = 3
 
         if isCoronaMaterial mtlchannel.elementname then (
             print "Has Corona Material pass "
@@ -1674,6 +1675,7 @@ function isSceneUseCorona =
         local filename = toLower pluginFile
         local matched = StringStartWith filename "coronamaxutils"
         if matched then (
+            
             return true
         )
     )
@@ -1698,10 +1700,13 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     local vrayVersion = ""
 
     if renderName == "vray" then (
+        UseVray = True
         vrayVersionInfo = getVrayVersion()
         vrayVersion = vrayVersionInfo[1]
     )
-
+    if renderName == "corona" then (
+        UseCorona = True
+    )
     -- 2015 --> 2016, < 2012 --> 2012
     local maxvi = (maxversion())[1]
     local softVersion = case  maxvi /1000 of
@@ -1745,7 +1750,10 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
         setINISetting tempIniFilePath "Cameras" "0" ""
     )
 
+
     setINISetting tempIniFilePath "Plugins" "vray" vrayVersion
+    setINISetting tempIniFilePath "Properties" "UseVray" (UseVray as string )
+    setINISetting tempIniFilePath "Properties" "UseCorona" (UseCorona as string )
     setINISetting tempIniFilePath "Properties" "lightrate" lightRate
     setINISetting tempIniFilePath "Properties" "pluginversion" myPluginInBuildVersion
     setINISetting tempIniFilePath "Properties" "maxfilename" taskName
@@ -1815,6 +1823,7 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     )
 
     if renderName == "corona" then (
+
         setINISetting tempIniFilePath "Properties" "_pass_limit" (args.Item["pass_limit"] as string)
         setINISetting tempIniFilePath "Properties" "_time_limit" (args.Item["time_limit"] as string)
         setINISetting tempIniFilePath "Properties" "_noise_level_limit" (args.Item["noise_level_limit"] as string)
@@ -1861,13 +1870,19 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     setINISetting tempIniFilePath "Properties" "rendertype" (getRenderType() as string)
 
     setINISetting tempIniFilePath "Properties" "rendername" renderName
+
     if renderName == "corona" then (
+       
         setINISetting tempIniFilePath "Plugins" "corona" (getCoronaRendererVersion(true))
         setINISetting tempIniFilePath "Properties" "lightjobenabled" "false"
+
     ) else (
         if isSceneUseCorona() then (
+
             setINISetting tempIniFilePath "Plugins" "corona" (getCoronaRendererVersion(false))
+            
         )
+
     )
 
     pluginEnum = pluginsVersion.GetEnumerator()
@@ -1919,8 +1934,8 @@ function checkSetting =
         return true
     )
     if (findstring currentRenderer "Corona") != undefined then (
-        return true
-    )
+            return true
+        )
     if (findstring currentRenderer "V_Ray_") == undefined then (
         messagebox "当前仅支持VRay渲染器和CR渲染器，其它渲染器请联系客服。        " title:myAppName
         return false
@@ -2426,28 +2441,45 @@ function checkMixupMtl renderName =
         mtlArray = crMtl
         msg = "当前渲染器是VRay，模型用到了CR(Corona Renderer)的材质"
         code = "26"
+        for mtlObject in sceneMaterials do (
+            className = (classof mtlObject) as string
+            if (findItem mtlArray className) > 0 then (
+                UseCorona = True
+                foundMixupMtl = true
+                exit
+            )
+        )
+    
+        if not foundMixupMtl then (
+            return #("","")
+        )
+        msg += "，可能导致颜色通道渲染结果不正确。\r\n"
+        return #(msg,code)
     ) else if renderName == "corona" then (
         join vrMtl vrMtl2
         mtlArray = vrMtl
         msg = "当前渲染器是CR(Corona Renderer)，模型用到了VRay的材质"
+    
         code = "27"
+        for mtlObject in sceneMaterials do (
+            className = (classof mtlObject) as string
+            if (findItem mtlArray className) > 0 then (
+                UseVray= True
+                foundMixupMtl = true
+                exit
+            )
+        )
+    
+        if not foundMixupMtl then (
+            return #("","")
+        )
+        msg += "，可能导致颜色通道渲染结果不正确。\r\n"
+        return #(msg,code)
     ) else (
         return #("","")
     )
 
-    for mtlObject in sceneMaterials do (
-        className = (classof mtlObject) as string
-        if (findItem mtlArray className) > 0 then (
-            foundMixupMtl = true
-            exit
-        )
-    )
 
-    if not foundMixupMtl then (
-        return #("","")
-    )
-    msg += "，可能导致颜色通道渲染结果不正确。\r\n"
-    return #(msg,code)
 )
 
 function getVRayExtraTex = (
@@ -2971,7 +3003,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
     local iniFilePath = (scriptSelfDir + "\\setting.ini")
     local taskIniFilePath = ""
     local extList = #("TGA","JPG","EXR","PNG","TIF","BMP", "RPF")
-    local nodecount = #("经济","加速","极速")
+    local nodecount = #("经济(56线程)","加速(112线程)","极速(224线程)")
     local originalFileExt = toUpper(getFilenameType rendOutputFilename)
     local extChanged = false
     -- local freemodeMaxTimeout = getFreeModeTime()
@@ -3070,14 +3102,14 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
         spinner spNoiseLimit "噪点等级限制：" align:#left pos:[20,575] range:[0,1000.0,0] type:#float height:20 width:80
 
         checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,600]
-        spinner spGamma "" align:#left pos:[160,600] range:[0.1,5.0, 1.0] type:#float height:20 width:50
+        spinner spGamma "" align:#left pos:[160,600] range:[0.1,5.0, 1.0] type:#float height:20 width:50 enabled:false
 
 
         -- 增加通道
         checkbox checkboxDeleteOtherChannel "删除其它通道" align:#left  pos:[20,620]
-        checkbox checkboxColor "颜色通道" align:#left  pos:[120,620]
-        checkbox checkboxMtl "材质通道" align:#left  pos:[190,620]
-        checkbox checkboxAO "AO"  pos:[260,620]
+        checkbox checkboxColor "颜色通道" align:#left  pos:[120,620] checked:true
+        checkbox checkboxMtl "材质通道" align:#left  pos:[190,620] checked:true
+        checkbox checkboxAO "AO"  pos:[260,620] checked:true
 
         spinner spRadiu  aoRadiuCaption  align:#left pos:[320,620] range:[0,1000000000,AORadiu] type:#worldUnits height:20 width:80
         spinner spSubdiv "细分" align:#left pos:[430,620] range:[1,1000,16] type:#integer height:20 width:50
@@ -3151,12 +3183,12 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
     on dropdownlistrendernodecount selected index do (
         changecount = nodecount[index]
         print changecount
-        if changecount != "经济" then (
+        if changecount != "经济(56线程)" then (
             DBR_job = True
-            if changecount == "加速" then (
+            if changecount == "加速(112线程)" then (
                 rendernodecount =2
             )
-            if changecount == "极速" then (
+            if changecount == "极速(224线程)" then (
                 rendernodecount =4
             )
             if rendererName == "vray" then (
@@ -3419,13 +3451,13 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
             editFrames.text = getFrameString()
 
             if (IDisplayGamma.colorCorrectionMode == #gamma) then (
-                checkboxGamma.checked = false
-                spGamma.enabled = true
+                -- checkboxGamma.checked = false
+                -- spGamma.enabled = true
                 spGamma.value = IDisplayGamma.gamma
             ) else (
-                checkboxGamma.checked = false
-                spGamma.enabled = false
-                spGamma.value = fileOutGamma
+                -- checkboxGamma.checked = false
+                -- spGamma.enabled = false
+                spGamma.value = IDisplayGamma.gamma
             )
 
             labelFirstEngine.enabled = false
@@ -3767,7 +3799,7 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
         if theState then (
             spGamma.value = IDisplayGamma.gamma
         ) else (
-            spGamma.value = fileOutGamma
+            spGamma.value = IDisplayGamma.gamma
         )
     )
 
