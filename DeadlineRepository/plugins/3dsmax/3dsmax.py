@@ -1700,7 +1700,13 @@ class MaxController(object):
                 self.Plugin.VerifyMonitoredManagedProcess(self.ProgramName)
                 shot_obj.stop_shot()
                 frame = frame + 1
-
+            #### add for render material 
+            material_postRenderScript = os.path.join(self.Plugin.GetPluginDirectory(), "Render_material_post.ms")
+            self.Plugin.LogInfo( " ++++   >>  material_postRenderScript = {}".format( material_postRenderScript ))
+            if os.path.isfile(material_postRenderScript) :
+                self.Plugin.LogInfo( " ++++   >>  Run material_postRenderScript " )
+                self.ExecuteMaxScriptFile(material_postRenderScript)
+            #### add for render material 
             self.Plugin.SetProgress(100.0)
         else:
             self.Plugin.LogInfo("Skipping frame rendering because 'Disable Frame Rendering' is enabled")
