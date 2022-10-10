@@ -56,7 +56,7 @@ fn getRendererIdString =
 print (getRendererIdString() as string )
 if getRendererIdString() == "vray" then (
     showvfb = vfbControl #show
-    if showvfb[1] then (
+    if showvfb[1] ==1 then (
         print ("Default Vray Renderer 1")
         rendUseActiveView=true
         create_vfb_snapshot savepath
