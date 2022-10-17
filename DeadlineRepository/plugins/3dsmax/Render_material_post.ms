@@ -9,80 +9,95 @@ global zall=#()
 global oldmat=#()
 fn ScaLinRen = --扫描线渲染器功能
 (
-
-	disableSceneRedraw()
-	renderpresets.saveall 0 (GetDir #renderPresets + "\\temp.rps")
-	EMlist = maxOps.GetCurRenderElementMgr()
-	EMlist.removeallrenderelements()
-	useEnvironmentMap = off
-	backgroundColor = color 0 0 0
-	coll=Target_Light
-	if classof coll == Target_Light then
-	for i in lights where classof i != targetobject do i.激活 = false
-	col=VR阳光
-	if classof col == VR阳光 then
-	for i in lights where classof i != targetobject do i.on = false
-	for i in $* do 
-	(if (superclassof i)==geometryclass do append zall i) 
-	for i=1 to zall.count do oldmat[i]=zall[i].material
+ --↓↓↓渲染前↓↓↓--
+ disableSceneRedraw()
+ renderpresets.saveall 0 (GetDir #renderPresets + "\\temp.rps")
+ EMlist = maxOps.GetCurRenderElementMgr()
+ EMlist.removeallrenderelements()
+ useEnvironmentMap = off
+ backgroundColor = color 0 0 0
+ coll=Target_Light
+ if classof coll == Target_Light then
+ for i in lights where classof i != targetobject do i.激活 = false
+ col=VR阳光
+ if classof col == VR阳光 then
+ for i in lights where classof i != targetobject do i.on = false
+ for i in $* do 
+ (if (superclassof i)==geometryclass do append zall i) 
+ for i=1 to zall.count do oldmat[i]=zall[i].material
+	(
+	 for i in $* do 
+		( 
+		 rcolor = random (color 0 0 0) (color 255 255 255)
+		 zm = standardmaterial selfIllumAmount:100\
+		 ambient:rcolor diffuse:rcolor
+		 if i.material==undefined do i.material=zm
+		)
+	 for x=1 to scenematerials.count do 
 		(
-		for i in $* do 
-			( 
-			rcolor = random (color 0 0 0) (color 255 255 255)
-			zm = standardmaterial selfIllumAmount:100\
-			ambient:rcolor diffuse:rcolor
-			if i.material==undefined do i.material=zm
-			)
-		for x=1 to scenematerials.count do 
+		 rcolor = random (color 0 0 0) (color 255 255 255)
+		 zm = standardmaterial selfIllumAmount:100\
+		 ambient:rcolor diffuse:rcolor
+			for i in zall do 
 			(
-			rcolor = random (color 0 0 0) (color 255 255 255)
-			zm = standardmaterial selfIllumAmount:100\
-			ambient:rcolor diffuse:rcolor
-				for i in zall do 
-				(
-				if i.material==scenematerials[x] do
-					( 
-					if ((classof i.material)==multimaterial)
-					then  
+			 if i.material==scenematerials[x] do
+				( 
+				 if ((classof i.material)==multimaterial)
+				 then  
+					(
+					 rcolorlan = random (color 0 0 0) (color 255 255 255)
+					 zmlan = multimaterial  selfIllumAmount:100 numsubs:(i.material.numsubs)\
+					 ambient:rcolorlan diffuse:rcolorlan
+					 for j=1 to  i.material.numsubs  do
 						(
-						rcolorlan = random (color 0 0 0) (color 255 255 255)
-						zmlan = multimaterial  selfIllumAmount:100 numsubs:(i.material.numsubs)\
-						ambient:rcolorlan diffuse:rcolorlan
-						for j=1 to  i.material.numsubs  do
-							(
-							rcolorlanx = random (color 0 0 0) (color 255 255 255)
-							zmlanx = standardmaterial selfIllumAmount:100\ 
-							ambient:rcolorlanx diffuse:rcolorlanx	
-							zmlan[j]=zmlanx
-							)
-						i.material=zmlan
+						 rcolorlanx = random (color 0 0 0) (color 255 255 255)
+						 zmlanx = standardmaterial selfIllumAmount:100\ 
+						 ambient:rcolorlanx diffuse:rcolorlanx	
+						 zmlan[j]=zmlanx
 						)
-					else i.material=zm
+					 i.material=zmlan
 					)
+				 else i.material=zm
 				)
 			)
-		rendShowVFB =on
-		renderSceneDialog.update()
-		renderers.current = RendererClass.classes[1]()
-		rendOutputFilename = (getFilenamePath (job_output) + "\\" + "SCLine_material2" + getFilenameType(rendOutputFilename) )
-		DeadlineUtil.LogMessage ("> >rendOutputFilename " + rendOutputFilename as string )
-		renderSceneDialog.update()
-		render outputfile:rendOutputFilename
-		--↓↓↓渲染后↓↓↓--
-			(
-			col=VR阳光
-			if classof col == VR阳光 then
-			for i in lights where classof i != targetobject do i.on = on
-			if classof coll == Target_Light then
-			for i in lights where classof i != targetobject do i.激活 = on
-			renderpresets.loadall 0 (GetDir #renderPresets + "\\temp.rps")
-			for i=1 to zall.count do zall[i].material=oldmat[i]
-			rendShowVFB =on
-			renderSceneDialog.update()
-			gc()
-			enableSceneRedraw()
-			)
+		)
 	)
+ DQ_RdSvFl = rendSaveFile
+ DQ_RdOpFlNm = rendOutputFilename
+ FPath = MaxFilePath
+ FName = getFileNameFile(MaxFileName)
+ NewLocTime = replace localTime 1 2"" --获取时间去掉年份前位百位
+ while findString NewLocTime "/" != undefined do --将所有/替换成-
+	(
+	 ZXG = findString NewLocTime "/" --搜索/替换成-
+	 NewLocTime = replace NewLocTime ZXG 1"-" 
+	 TH = findString NewLocTime ":"
+	 NewLocTime = replace NewLocTime TH 1"." --搜索:替换成.
+	)
+ try ACName = (getActiveCamera()).name catch(ACName = "自由视图")--获取视口相机名称
+ rendSaveFile = true
+ rendOutputFilename = ((FPath)+""+(FName)+" "+(ACName)+" "+(NewLocTime)+".tif") --设置输出名称设置输出名称
+ renderSceneDialog.update()
+ renderers.current = RendererClass.classes[1]()
+--  max quick render
+ rendOutputFilename = (getFilenamePath (job_output) + "\\" + "SCLine_material2" + getFilenameType(rendOutputFilename) )
+ DeadlineUtil.LogMessage ("> >rendOutputFilename " + rendOutputFilename as string )
+ renderSceneDialog.update()
+ render outputfile:rendOutputFilename
+ --↓↓↓渲染后↓↓↓--
+ rendSaveFile = DQ_RdSvFl
+ rendOutputFilename = DQ_RdOpFlNm
+ col=VR阳光
+ if classof col == VR阳光 then
+ for i in lights where classof i != targetobject do i.on = on
+ if classof coll == Target_Light then
+ for i in lights where classof i != targetobject do i.激活 = on
+ renderpresets.loadall 0 (GetDir #renderPresets + "\\temp.rps")
+ for i=1 to zall.count do zall[i].material=oldmat[i]
+ rendShowVFB =on
+ renderSceneDialog.update()
+ gc()
+ enableSceneRedraw()
 )
 fn VrPanRen = --Vray全景渲染功能
 (
@@ -164,7 +179,7 @@ fn VrPanRen = --Vray全景渲染功能
 					 for j=1 to  i.material.numsubs  do
 						(
 						 rcolorlanx = random (color 0 0 0) (color 255 255 255)
-						 zmlanx = VRayMtl selfillumination:rcolor diffuse:(color 0 0 0)
+						 zmlanx = VRayMtl selfillumination:rcolorlanx diffuse:(color 0 0 0)
 						 zmlan[j]=zmlanx
 						)
 					 i.material=zmlan
@@ -174,14 +189,31 @@ fn VrPanRen = --Vray全景渲染功能
 			)
 		)
 	)
-	rendOutputFilename = (getFilenamePath (job_output) + "\\" + "VR_material3" + getFilenameType(rendOutputFilename) )
-	DeadlineUtil.LogMessage ("> >rendOutputFilename " + rendOutputFilename as string )
-	renderSceneDialog.update()
-	render outputfile:rendOutputFilename
+ DQ_RdSvFl = rendSaveFile
+ DQ_RdOpFlNm = rendOutputFilename
+ FPath = MaxFilePath
+ FName = getFileNameFile(MaxFileName)
+ NewLocTime = replace localTime 1 2"" --获取时间去掉年份前位百位
+ while findString NewLocTime "/" != undefined do --将所有/替换成-
 	(
-	 for i=1 to zall.count do zall[i].material=oldmat[i]
+	 ZXG = findString NewLocTime "/" --搜索/替换成-
+	 NewLocTime = replace NewLocTime ZXG 1"-" 
+	 TH = findString NewLocTime ":"
+	 NewLocTime = replace NewLocTime TH 1"." --搜索:替换成.
 	)
+ try ACName = (getActiveCamera()).name catch(ACName = "自由视图")--获取视口相机名称
+ rendSaveFile = true
+ rendOutputFilename = ((FPath)+""+(FName)+" "+(ACName)+" "+(NewLocTime)+".tif") --设置输出名称设置输出名称
+ rendShowVFB =on
+ renderSceneDialog.update()
+ rendOutputFilename = (getFilenamePath (job_output) + "\\" + "VR_material3" + getFilenameType(rendOutputFilename) )
+ DeadlineUtil.LogMessage ("> >rendOutputFilename " + rendOutputFilename as string )
+ renderSceneDialog.update()
+ render outputfile:rendOutputFilename
  --↓↓↓渲染后↓↓↓--
+ rendSaveFile = DQ_RdSvFl
+ rendOutputFilename = DQ_RdOpFlNm
+ for i=1 to zall.count do zall[i].material=oldmat[i]
  renderers.current.output_saveRawFile = XXZ_RO --加载渲染输出开关
  renderers.current.options_hiddenLights = XXZ_HLS --加载隐藏灯光
  renderers.current.options_shadows = XXZ_SS --加载投影开关
@@ -252,7 +284,7 @@ fn CrPanRen = --Corona全景渲染功能
 					 for j=1 to  i.material.numsubs  do
 						(
 						 rcolorlanx = random (color 0 0 0) (color 255 255 255)
-						 zmlanx = CoronaLegacyMtl colorSelfIllum:rcolor colorDiffuse:(color 0 0 0) levelSelfIllum:1
+						 zmlanx = CoronaLegacyMtl colorSelfIllum:rcolorlanx colorDiffuse:(color 0 0 0) levelSelfIllum:1
 						 zmlan[j]=zmlanx
 						)
 					 i.material=zmlan
@@ -262,14 +294,31 @@ fn CrPanRen = --Corona全景渲染功能
 			)
 		)
 	)
-	rendOutputFilename = (getFilenamePath (job_output) + "\\" + "CR_material3" + getFilenameType(rendOutputFilename) )
-	DeadlineUtil.LogMessage ("> >rendOutputFilename " + rendOutputFilename as string )
-	renderSceneDialog.update()
-	render outputfile:rendOutputFilename
+ DQ_RdSvFl = rendSaveFile
+ DQ_RdOpFlNm = rendOutputFilename
+ FPath = MaxFilePath
+ FName = getFileNameFile(MaxFileName)
+ NewLocTime = replace localTime 1 2"" --获取时间去掉年份前位百位
+ while findString NewLocTime "/" != undefined do --将所有/替换成-
+	(
+	 ZXG = findString NewLocTime "/" --搜索/替换成-
+	 NewLocTime = replace NewLocTime ZXG 1"-" 
+	 TH = findString NewLocTime ":"
+	 NewLocTime = replace NewLocTime TH 1"." --搜索:替换成.
+	)
+ try ACName = (getActiveCamera()).name catch(ACName = "自由视图")--获取视口相机名称
+ rendSaveFile = true
+ rendOutputFilename = ((FPath)+""+(FName)+" "+(ACName)+" "+(NewLocTime)+".tif") --设置输出名称设置输出名称
+ rendOutputFilename = (getFilenamePath (job_output) + "\\" + "CR_material3" + getFilenameType(rendOutputFilename) )
+ DeadlineUtil.LogMessage ("> >rendOutputFilename " + rendOutputFilename as string )
+ renderSceneDialog.update()
+ render outputfile:rendOutputFilename
+ --↓↓↓渲染后↓↓↓--
+ rendSaveFile = DQ_RdSvFl
+ rendOutputFilename = DQ_RdOpFlNm
 	(
 	 for i=1 to zall.count do zall[i].material=oldmat[i]
 	)
- --↓↓↓渲染后↓↓↓--
  renderers.current.shading_primarySolver = XXZ_CrGi --定义当前GI引擎
  renderers.current.bg_source = XXZ_CrBg --定义当前背景模式
  renderers.current.bg_overrideDirect = XXZ_CrOvDir --定义当前背景直接光覆盖
