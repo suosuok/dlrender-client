@@ -6,8 +6,8 @@ global temp_renderoutput = rendOutputFilename
 global changeExtensionFormat = ".tga"
 global DBR_job = False
 global AnimationRender = False
-global UseVray = False 
-global UseCorona = False 
+global UseVray = False
+global UseCorona = False
 
 struct du (
 
@@ -1678,7 +1678,7 @@ function isSceneUseCorona =
         local filename = toLower pluginFile
         local matched = StringStartWith filename "coronamaxutils"
         if matched then (
-            
+
             return true
         )
     )
@@ -1875,7 +1875,7 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
     setINISetting tempIniFilePath "Properties" "rendername" renderName
 
     if renderName == "corona" then (
-       
+
         setINISetting tempIniFilePath "Plugins" "corona" (getCoronaRendererVersion(true))
         setINISetting tempIniFilePath "Properties" "lightjobenabled" "false"
 
@@ -1883,7 +1883,7 @@ function createIniFile scenepath tempdir strtime tempFilesListPath outputFilenam
         if isSceneUseCorona() then (
 
             setINISetting tempIniFilePath "Plugins" "corona" (getCoronaRendererVersion(false))
-            
+
         )
 
     )
@@ -2452,7 +2452,7 @@ function checkMixupMtl renderName =
                 exit
             )
         )
-    
+
         if not foundMixupMtl then (
             return #("","")
         )
@@ -2462,7 +2462,7 @@ function checkMixupMtl renderName =
         join vrMtl vrMtl2
         mtlArray = vrMtl
         msg = "当前渲染器是CR(Corona Renderer)，模型用到了VRay的材质"
-    
+
         code = "27"
         for mtlObject in sceneMaterials do (
             className = (classof mtlObject) as string
@@ -2472,7 +2472,7 @@ function checkMixupMtl renderName =
                 exit
             )
         )
-    
+
         if not foundMixupMtl then (
             return #("","")
         )
@@ -3047,16 +3047,16 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
 
     group "帧序列配置"
     (
-        checkbox animationmode "开启动画模式" pos:[20,225] enabled:true
+        checkbox animationmode "开启动画模式" pos:[20,225] enabled:false
 
-        edittext editFrames "帧序列:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,250] labelOnTop:false height:20
+        edittext editFrames "帧序列:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,252.5] labelOnTop:false height:20
         button labelFrameHelp "帧序列的格式与3dsmax标准格式相同" tooltip:tooltipFrameList pos:[221,250] border:false
         edittext editPreviewFrames "优先帧:" tooltip:tooltipFrameList fieldWidth:150 pos:[20,275] labelOnTop:false height:20 visible:false
 
         checkbox checkboxPreviewStop "优先帧完成后暂停" pos:[230,275] height:20 visible:false
 
         label labelnodecount "渲染节点数量" pos:[230,275] enabled:true
-        dropdownlist dropdownlistrendernodecount items:nodecount pos:[370,270] width:100
+        dropdownlist dropdownlistrendernodecount items:nodecount pos:[370,272.5] width:100
 
 
     )
@@ -3083,15 +3083,15 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
         -- button btnAddDir "添加"  pos:[370,513]
         -- button btnDeleteDir "删除"  pos:[430,513]
 
-        checkbox checkboxLight "先渲染光子" toolTip:tooltipLight checked:false fieldwidth:40 align:#left pos:[20,550]
-        label labelFirstEngine "首次引擎"  pos:[110,550]
-        dropdownlist dropdownlistFirstEngine items:firstEngineNameList pos:[160,550] width:70 height:18
-        label labelSecondEngine "二次引擎"  pos:[250,550]
-        dropdownlist dropdownlistSecondEngine items:secondEngineNameList pos:[300,550] width:80 height:18
-        label labelLightRate "光子比例"  pos:[385,550]
-        dropdownlist dropdownlistLightRate items:lightRateList pos:[435,550] width:55 height:18
-        edittext editLightFrames "光子帧序列:" fieldWidth:150 pos:[20,580] labelOnTop:false height:16
-        spinner spLightFrame  "每N帧渲染一次光子：" fieldwidth:30 align:#left pos:[330,580] range:[1,1000,1] type:#integer
+        checkbox checkboxLight "先渲染光子" toolTip:tooltipLight checked:false fieldwidth:40 align:#left pos:[20,550] enabled:false
+        label labelFirstEngine "首次引擎"  pos:[110,550] enabled:false
+        dropdownlist dropdownlistFirstEngine items:firstEngineNameList pos:[160,550] width:70 height:18 enabled:false
+        label labelSecondEngine "二次引擎"  pos:[250,550] enabled:false
+        dropdownlist dropdownlistSecondEngine items:secondEngineNameList pos:[300,550] width:80 height:18 enabled:false
+        label labelLightRate "光子比例"  pos:[385,550] enabled:false
+        dropdownlist dropdownlistLightRate items:lightRateList pos:[435,550] width:55 height:18 enabled:false
+        edittext editLightFrames "光子帧序列:" fieldWidth:150 pos:[20,580] labelOnTop:false height:16 enabled:false
+        spinner spLightFrame  "每N帧渲染一次光子：" fieldwidth:30 align:#left pos:[330,580] range:[1,1000,1] type:#integer enabled:false
 
 
         spinner spPassLimit "        过程限制：" align:#left pos:[20,550] range:[0,1048576,0] type:#integer height:20 width:80
@@ -3104,8 +3104,8 @@ rollout renderfarmSetting "渲染设置" width:500 height:750
         label labelSecond "秒" pos:[470,550]
         spinner spNoiseLimit "噪点等级限制：" align:#left pos:[20,575] range:[0,1000.0,0] type:#float height:20 width:80
 
-        checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,600]
-        spinner spGamma "" align:#left pos:[160,600] range:[0.1,5.0, 1.0] type:#float height:20 width:50 enabled:false
+        checkbox checkboxGamma "输出伽马(Gamma)校正" toolTip:tooltipGamma pos:[20,600] checked:true
+        spinner spGamma "" align:#left pos:[160,600] range:[0.1,5.0, 1.0] type:#float height:20 width:50
 
 
         -- 增加通道
