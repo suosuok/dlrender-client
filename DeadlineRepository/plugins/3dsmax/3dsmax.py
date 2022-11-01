@@ -521,7 +521,7 @@ class MaxController(object):
         self.IgnoreMissingDLLs = False
         self.DisableMultipass = False
 
-        self.GammaCorrection = False
+        self.GammaCorrection = True
         self.GammaInput = 1.0
         self.GammaOutput = 1.0
 
@@ -1440,7 +1440,7 @@ class MaxController(object):
         self.GammaCorrection = self.Plugin.GetBooleanPluginInfoEntryWithDefault("GammaCorrection", False)
         self.Plugin.LogInfo("Enable gamma correction: %d" % self.GammaCorrection)
         if self.GammaCorrection:
-            self.GammaInput = self.Plugin.GetFloatPluginInfoEntryWithDefault("GammaInput", 1.0)
+            self.GammaInput = 1.0
             self.GammaOutput = self.Plugin.GetFloatPluginInfoEntryWithDefault("GammaOutput", 1.0)
             self.Plugin.LogInfo("Gamma Input: %s" % self.GammaInput)
             self.Plugin.LogInfo("Gamma Output: %s" % self.GammaOutput)
@@ -1700,13 +1700,13 @@ class MaxController(object):
                 self.Plugin.VerifyMonitoredManagedProcess(self.ProgramName)
                 shot_obj.stop_shot()
                 frame = frame + 1
-            #### add for render material 
+            #### add for render material
             material_postRenderScript = os.path.join(self.Plugin.GetPluginDirectory(), "Render_material_post.ms")
             self.Plugin.LogInfo( " ++++   >>  material_postRenderScript = {}".format( material_postRenderScript ))
             if os.path.isfile(material_postRenderScript) :
                 self.Plugin.LogInfo( " ++++   >>  Run material_postRenderScript " )
                 self.ExecuteMaxScriptFile(material_postRenderScript)
-            #### add for render material 
+            #### add for render material
             self.Plugin.SetProgress(100.0)
         else:
             self.Plugin.LogInfo("Skipping frame rendering because 'Disable Frame Rendering' is enabled")
@@ -2328,6 +2328,7 @@ class MaxController(object):
     def LoadMaxFile(self):
         # Set some pre-loading settings.
         if (self.GammaCorrection):
+            self.Plugin.LogInfo("GammaCorrection," + str(self.GammaInput) + "," + str(self.GammaOutput))
             self.MaxSocket.Send("GammaCorrection," + str(self.GammaInput) + "," + str(self.GammaOutput))
         if (self.IgnoreMissingExternalFiles):
             self.MaxSocket.Send("IgnoreMissingExternalFiles")
@@ -3720,18 +3721,17 @@ class VRaySpawnerProcess(ManagedProcess):
         """
         job = self.Plugin.GetJob()
         vraySpawnerExepath = ""
-        for x in ["", 4, 5]:
-            vray_key = "VRAY{0}_FOR_3DSMAX{1}_MAIN".format(x, maxVersion)
+        vray_max_root = job.GetJobEnvironmentKeyValue("{}".format("VRAY_FOR_3DSMAX_ROOT"))
+        self.Plugin.LogInfo("vray_max_root = {}".format(vray_max_root))
+        vraySpawnerExepath = "{0}\\vrayspawner{1}.exe".format(vray_max_root, maxVersion)
+        self.Plugin.LogInfo("vraySpawnerExepath = {}".format(vraySpawnerExepath))
+        if os.path.exists(vraySpawnerExepath) and os.path.isfile(vraySpawnerExepath):
+            self.Plugin.LogInfo("vraySpawnerExepath = {}".format(vraySpawnerExepath))
+        else:
+            vray_max_root = job.GetJobEnvironmentKeyValue("{}".format("VRAY_ROOT_PATH"))
+            vraySpawnerExepath = "{0}\\vrayspawner{1}.exe".format(vray_max_root, maxVersion)
+            self.Plugin.LogInfo("vraySpawnerExepath2 = {}".format(vraySpawnerExepath))
 
-            vr_value = job.GetJobEnvironmentKeyValue("{}".format(vray_key))
-            if vr_value:
-                vraySpawnerExepath = "{0}\\vrayspawner{1}.exe".format(vr_value, maxVersion)
-                if os.path.exists(vraySpawnerExepath) and os.path.isfile(vraySpawnerExepath):
-                    self.Plugin.LogInfo("vraySpawnerExepath = {}".format(vraySpawnerExepath))
-                else:
-                    vray_max_root = job.GetJobEnvironmentKeyValue("{}".format("VRAY_FOR_3DSMAX_ROOT"))
-                    vraySpawnerExepath = "{0}\\vrayspawner{1}.exe".format(vray_max_root, maxVersion)
-                    self.Plugin.LogInfo("vraySpawnerExepath2 = {}".format(vraySpawnerExepath))
         return vraySpawnerExepath
 
     def RenderExecutable(self):
@@ -3750,7 +3750,7 @@ class VRaySpawnerProcess(ManagedProcess):
                 r"C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max %s for x64\bin\vrayrtspawner.exe" % version,
                 r"C:\Program Files\Chaos Group\V-Ray\RT for 3ds Max %s for x86\bin\vrayrtspawner.exe" % version,
                 r"C:\Program Files (x86)\Chaos Group\V-Ray\RT for 3ds Max %s for x86\bin\vrayrtspawner.exe" % version,
-            ])
+                ])
 
             vraySpawnerExecutable = FileUtils.SearchFileList(exeList)
 
@@ -3770,6 +3770,7 @@ class VRaySpawnerProcess(ManagedProcess):
             # vraySpawnerExecutable = PathUtils.ChangeFilename( maxRenderExecutable, "vrayspawner" + str(version) + ".exe" )
             ###  modify by xubaolong for get vray spawner Executable by plugins libs ###
             vraySpawnerExecutable = self.GetVraySpawnerEnvironmet(version)
+            self.Plugin.LogInfo("vraySpawnerExecutable final = {}".format( str (vraySpawnerExecutable)))
             if not os.path.exists(vraySpawnerExecutable):
                 vraySpawnerExecutable = PathUtils.ChangeFilename(maxRenderExecutable,
                                                                  "vrayspawner" + str(version) + ".exe")
